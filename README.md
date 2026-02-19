@@ -42,7 +42,7 @@ PANTools includes a built-in **Over-The-Air (OTA) update mechanism**. The Hub au
 
 1. **Clone the repository:**
    ```bash
-   git clone [https://github.com/davidpm84/pantools.git](https://github.com/davidpm84/pantools.git)
+   git clone https://github.com/davidpm84/PANTools.git
    cd pantools
 Deploy the container:
 Ensure port 80 is available on your host machine, then run:
