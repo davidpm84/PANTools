@@ -1,0 +1,13 @@
+services:
+    php:
+        # En lugar de usar la imagen directa, le decimos que construya la nuestra
+        build: . 
+        container_name: xsiam_deployer
+        ports:
+            - 80:80
+        volumes:
+            - ./www:/var/www/html
+   
+        environment:
+            # Configuración extra para que Python funcione bien dentro de Apache
+            - PYTHONIOENCODING=utf-8
