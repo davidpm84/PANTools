@@ -8,14 +8,41 @@ $updateMessage = "";
 $updateError = false;
 $localHash = "Unknown";
 
-// Verificar actualizaciones de PANTools (Fetch silencioso)
 if (is_dir("$repoPath/.git")) {
-    exec("cd " . escapeshellarg($repoPath) . " && git fetch origin main 2>&1");
-    $localHash = trim(shell_exec("cd " . escapeshellarg($repoPath) . " && git rev-parse HEAD"));
-    $remoteHash = trim(shell_exec("cd " . escapeshellarg($repoPath) . " && git rev-parse origin/main"));
+    // A. Intentar vía Comando Git (Con corrección de directorio seguro para Docker)
+    exec("cd " . escapeshellarg($repoPath) . " && git config --global --add safe.directory /var/www/html 2>&1");
+    $cmdHash = shell_exec("cd " . escapeshellarg($repoPath) . " && git rev-parse --short HEAD 2>&1");
+    
+    if ($cmdHash && preg_match('/^[a-f0-9]{7}/', trim($cmdHash))) {
+        $localHash = trim($cmdHash);
+    } 
+    // B. PLAN B: Leer los archivos de Git directamente (si el comando falla por permisos)
+    else {
+        $headFile = "$repoPath/.git/HEAD";
+        if (file_exists($headFile)) {
+            $headContent = trim(file_get_contents($headFile));
+            if (strpos($headContent, 'ref:') === 0) {
+                // Es un puntero a una rama (ej: ref: refs/heads/main)
+                $refPath = "$repoPath/.git/" . trim(substr($headContent, 5));
+                if (file_exists($refPath)) {
+                    $localHash = substr(trim(file_get_contents($refPath)), 0, 7);
+                }
+            } else {
+                // Es un hash directo (Detached HEAD)
+                $localHash = substr($headContent, 0, 7);
+            }
+        }
+    }
 
-    if ($localHash !== $remoteHash && !empty($remoteHash)) {
-        $updateAvailable = true;
+    // Verificar actualizaciones (solo si tenemos un hash válido)
+    if ($localHash !== "Unknown") {
+        exec("cd " . escapeshellarg($repoPath) . " && git fetch origin main 2>&1");
+        $remoteHashRaw = shell_exec("cd " . escapeshellarg($repoPath) . " && git rev-parse --short origin/main 2>&1");
+        $remoteHash = trim($remoteHashRaw ?? "");
+
+        if (!empty($remoteHash) && preg_match('/^[a-f0-9]{7}/', $remoteHash) && $localHash !== $remoteHash) {
+            $updateAvailable = true;
+        }
     }
 }
 
@@ -23,8 +50,7 @@ if (is_dir("$repoPath/.git")) {
 if (isset($_POST['action']) && $_POST['action'] === 'self_update') {
     exec("cd " . escapeshellarg($repoPath) . " && git reset --hard origin/main 2>&1", $updateOut, $updateRet);
     if ($updateRet === 0) {
-        $updateMessage = "✅ PANTools updated successfully to the latest version!";
-        $updateAvailable = false;
+        $updateMessage = "✅ PANTools updated successfully! Reloading...";
         header("Refresh:2"); 
     } else {
         $updateMessage = "❌ Update failed: " . implode(" ", $updateOut);
@@ -37,10 +63,10 @@ $configFile = __DIR__ . '/.config.json';
 $config = file_exists($configFile) ? json_decode(file_get_contents($configFile), true) : [];
 $setupError = "";
 
+// Acción: Guardar Token
 if (isset($_POST['action']) && $_POST['action'] === 'save_setup') {
     $token = trim($_POST['setup_token']);
     
-    // Validación contra GitHub
     $ch = curl_init("https://api.github.com/user");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["User-Agent: PANTools", "Authorization: token $token"]);
@@ -49,11 +75,9 @@ if (isset($_POST['action']) && $_POST['action'] === 'save_setup') {
     curl_close($ch);
 
     if ($httpCode === 200) {
-        $config = [
-            'token' => $token,
-            'setup_date' => date('Y-m-d H:i:s')
-        ];
+        $config = ['token' => $token, 'setup_date' => date('Y-m-d H:i:s')];
         file_put_contents($configFile, json_encode($config));
+        unset($_SESSION['setup_skipped']);
         header("Location: " . $_SERVER['PHP_SELF']);
         exit;
     } else {
@@ -61,10 +85,14 @@ if (isset($_POST['action']) && $_POST['action'] === 'save_setup') {
     }
 }
 
+// Acción: Skip Setup
 if (isset($_POST['action']) && $_POST['action'] === 'skip_setup') {
     $_SESSION['setup_skipped'] = true;
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
 }
 
+// Acción: Reset (Desconectar)
 if (isset($_POST['action']) && $_POST['action'] === 'reset_config') {
     if (file_exists($configFile)) unlink($configFile);
     unset($_SESSION['setup_skipped']);
@@ -86,58 +114,46 @@ $showSetup = !$hasToken && !isset($_SESSION['setup_skipped']);
 
     <style>
         :root {
-            --strata-color: #EA212D; /* PAN Red */
-            --cortex-color: #00C55E; /* Cortex Green */
-            --mgmt-color: #343a40;   /* Dark for Management */
+            --strata-color: #EA212D;
+            --cortex-color: #00C55E;
+            --mgmt-color: #343a40;
             --bg-light: #F8F9FA;
         }
         
         body { background-color: var(--bg-light); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
-        /* Navbar */
         .navbar { background-color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         .navbar-brand { font-weight: 800; font-size: 1.5rem; letter-spacing: -0.5px; color: #333 !important; display: flex; align-items: center; }
         
-        /* Banner de actualización */
         .update-banner { border-radius: 8px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); animation: slideIn 0.5s ease-out; }
         @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        /* Section Headers */
         .section-title { position: relative; padding-left: 15px; margin-bottom: 25px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #555; }
         .section-title::before { content: ''; position: absolute; left: 0; top: 5px; bottom: 5px; width: 5px; border-radius: 2px; }
         
         .title-strata::before { background-color: var(--strata-color); }
-        .text-strata { color: var(--strata-color); }
-        .btn-strata { background-color: #fff; color: var(--strata-color); border: 1px solid var(--strata-color); }
-        .btn-strata:hover { background-color: var(--strata-color); color: #fff; }
-        .card-strata { border-top: 4px solid var(--strata-color); }
-
         .title-cortex::before { background-color: var(--cortex-color); }
-        .text-cortex { color: var(--cortex-color); }
-        .btn-cortex { background-color: #fff; color: var(--cortex-color); border: 1px solid var(--cortex-color); }
-        .btn-cortex:hover { background-color: var(--cortex-color); color: #fff; }
-        .card-cortex { border-top: 4px solid var(--cortex-color); }
-
         .title-mgmt::before { background-color: var(--mgmt-color); }
-        .text-mgmt { color: var(--mgmt-color); }
-        .btn-mgmt { background-color: #fff; color: var(--mgmt-color); border: 1px solid var(--mgmt-color); }
-        .btn-mgmt:hover { background-color: var(--mgmt-color); color: #fff; }
+
+        .tool-card { border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: transform 0.2s; height: 100%; background: white; border: none; }
+        .tool-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px rgba(0,0,0,0.05); }
+        
+        .card-strata { border-top: 4px solid var(--strata-color); }
+        .card-cortex { border-top: 4px solid var(--cortex-color); }
         .card-mgmt { border-top: 4px solid var(--mgmt-color); }
 
-        /* Card Styling */
-        .tool-card {
-            border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: transform 0.2s, box-shadow 0.2s; height: 100%; background: white;
-        }
-        .tool-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px rgba(0,0,0,0.05); }
         .card-icon { font-size: 2.5rem; margin-bottom: 15px; }
         .card-desc { font-size: 0.9rem; color: #6c757d; min-height: 40px; }
 
-        /* Modals & Overlays */
         .setup-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; display:flex; align-items:center; justify-content:center; backdrop-filter: blur(5px); }
         
-        /* Disabled Card */
         .card-disabled { opacity: 0.65; filter: grayscale(1); pointer-events: none; position: relative; }
         .lock-overlay { position: absolute; top: 15px; right: 15px; background: #e9ecef; color: #495057; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; border: 1px solid #ced4da; }
+
+        .btn-strata { background-color: #fff; color: var(--strata-color); border: 1px solid var(--strata-color); }
+        .btn-strata:hover { background-color: var(--strata-color); color: #fff; }
+        .btn-cortex { background-color: #fff; color: var(--cortex-color); border: 1px solid var(--cortex-color); }
+        .btn-cortex:hover { background-color: var(--cortex-color); color: #fff; }
     </style>
 </head>
 <body>
@@ -156,7 +172,9 @@ $showSetup = !$hasToken && !isset($_SESSION['setup_skipped']);
                 <input type="password" name="setup_token" class="form-control bg-light" placeholder="github_pat_11..." required>
             </div>
             <button type="submit" name="action" value="save_setup" class="btn btn-dark w-100 fw-bold mb-2">CONNECT GITHUB</button>
-            <button type="submit" name="action" value="skip_setup" class="btn btn-link w-100 text-muted btn-sm text-decoration-none">Skip for now (Importer will be disabled)</button>
+            <button type="submit" name="action" value="skip_setup" class="btn btn-link w-100 text-muted btn-sm text-decoration-none" formnovalidate>
+                Skip for now (Importer will be disabled)
+            </button>
         </form>
     </div>
 </div>
@@ -166,16 +184,18 @@ $showSetup = !$hasToken && !isset($_SESSION['setup_skipped']);
     <div class="container">
         <a class="navbar-brand" href="#">
             <span style="border-left: 2px solid #ddd; padding-left: 15px;">PANTools</span>
-            <span class="badge bg-light text-muted border ms-2" style="font-size: 0.6rem;"><?= substr($localHash, 0, 7) ?></span>
+            <span class="badge bg-light text-muted border ms-2" style="font-size: 0.6rem;"><?= htmlspecialchars($localHash) ?></span>
         </a>
         
         <div class="d-flex align-items-center gap-3">
             <?php if (!$hasToken): ?>
                 <span class="badge bg-warning text-dark border border-warning"><i class="fas fa-lock me-1"></i> Limited Mode</span>
-                <button class="btn btn-sm btn-outline-dark fw-bold" onclick="window.location.reload();">Add Token</button>
+                <form method="POST" class="m-0">
+                    <button type="submit" name="action" value="reset_config" class="btn btn-sm btn-outline-dark fw-bold">Setup GitHub</button>
+                </form>
             <?php else: ?>
                 <span class="badge bg-success text-white"><i class="fas fa-check-circle me-1"></i> GitHub Connected</span>
-                <form method="POST" class="m-0" onsubmit="return confirm('Disconnect GitHub and remove local token?');">
+                <form method="POST" class="m-0" onsubmit="return confirm('Disconnect GitHub?');">
                     <button type="submit" name="action" value="reset_config" class="btn btn-link btn-sm text-danger text-decoration-none p-0"><i class="fas fa-unlink"></i> Disconnect</button>
                 </form>
             <?php endif; ?>
@@ -193,7 +213,7 @@ $showSetup = !$hasToken && !isset($_SESSION['setup_skipped']);
         <div class="alert alert-warning update-banner shadow-sm mb-4 d-flex justify-content-between align-items-center">
             <div>
                 <i class="fas fa-sparkles text-warning me-2"></i>
-                <strong>New version available!</strong> Keep your SE tools up to date with the latest features.
+                <strong>New version available!</strong> Keep your SE tools up to date.
             </div>
             <form method="POST">
                 <button type="submit" name="action" value="self_update" class="btn btn-dark btn-sm fw-bold px-3">
@@ -214,13 +234,11 @@ $showSetup = !$hasToken && !isset($_SESSION['setup_skipped']);
         <h4 class="section-title title-strata">STRATA <span class="text-muted fs-6 fw-normal">(NGFW & SASE Tools)</span></h4>
         <div class="row g-4">
             <div class="col-md-6 col-lg-4">
-                <div class="card tool-card card-strata p-4">
-                    <div class="text-center">
-                        <div class="card-icon text-strata"><i class="fas fa-fire-alt"></i></div>
-                        <h5 class="fw-bold mb-2">PAN Firewall Mapper</h5>
-                        <p class="card-desc">Tool for mapping and migrating Firewall configurations and rules.</p>
-                        <a href="strata/panfirewallmapper/index.php" class="btn btn-strata w-100 fw-bold">Open Tool</a>
-                    </div>
+                <div class="card tool-card card-strata p-4 text-center">
+                    <div class="card-icon" style="color: var(--strata-color);"><i class="fas fa-fire-alt"></i></div>
+                    <h5 class="fw-bold mb-2">PAN Firewall Mapper</h5>
+                    <p class="card-desc">Tool for mapping and migrating Firewall configurations.</p>
+                    <a href="strata/panfirewallmapper/index.php" class="btn btn-strata w-100 fw-bold">Open Tool</a>
                 </div>
             </div>
         </div>
@@ -229,33 +247,26 @@ $showSetup = !$hasToken && !isset($_SESSION['setup_skipped']);
     <div class="mb-5">
         <h4 class="section-title title-cortex">CORTEX <span class="text-muted fs-6 fw-normal">(SecOps & Cloud Tools)</span></h4>
         <div class="row g-4">
-            
             <div class="col-md-6 col-lg-4">
                 <div class="card tool-card card-cortex p-4 <?= !$hasToken ? 'card-disabled' : '' ?>">
-                    <?php if (!$hasToken): ?>
-                        <div class="lock-overlay"><i class="fas fa-lock"></i> Requires Token</div>
-                    <?php endif; ?>
-                    
+                    <?php if (!$hasToken): ?><div class="lock-overlay"><i class="fas fa-lock"></i> Requires Token</div><?php endif; ?>
                     <div class="text-center">
-                        <div class="card-icon text-cortex"><i class="fas fa-box-open"></i></div>
+                        <div class="card-icon" style="color: var(--cortex-color);"><i class="fas fa-box-open"></i></div>
                         <h5 class="fw-bold mb-2">Custom Content Importer</h5>
-                        <p class="card-desc">Import custom integrations, layouts, scripts, and playbooks into Cortex.</p>
+                        <p class="card-desc">Import integrations and playbooks from GitHub.</p>
                         <a href="cortex/contentimporter.php" class="btn btn-cortex w-100 fw-bold <?= !$hasToken ? 'disabled' : '' ?>">Open Tool</a>
                     </div>
                 </div>
             </div>
 
             <div class="col-md-6 col-lg-4">
-                <div class="card tool-card card-cortex p-4">
-                    <div class="text-center">
-                        <div class="card-icon text-cortex"><i class="fas fa-clipboard-check"></i></div>
-                        <h5 class="fw-bold mb-2">Cortex Health & Audit</h5>
-                        <p class="card-desc">Review policies and profiles in use for XDR and XSIAM tenants (BPA/Health Check).</p>
-                        <a href="cortex/cortexaudit.php" class="btn btn-cortex w-100 fw-bold">Open Tool</a>
-                    </div>
+                <div class="card tool-card card-cortex p-4 text-center">
+                    <div class="card-icon" style="color: var(--cortex-color);"><i class="fas fa-clipboard-check"></i></div>
+                    <h5 class="fw-bold mb-2">Cortex Health & Audit</h5>
+                    <p class="card-desc">Tenant BPA and Policy Audit tool.</p>
+                    <a href="cortex/cortexaudit.php" class="btn btn-cortex w-100 fw-bold">Open Tool</a>
                 </div>
             </div>
-            
         </div>
     </div>
 
@@ -263,25 +274,15 @@ $showSetup = !$hasToken && !isset($_SESSION['setup_skipped']);
         <h4 class="section-title title-mgmt">Management <span class="text-muted fs-6 fw-normal">(PoV & Tracking)</span></h4>
         <div class="row g-4">
             <div class="col-md-6 col-lg-4">
-                <div class="card tool-card card-mgmt p-4">
-                    <div class="text-center">
-                        <div class="card-icon text-mgmt">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <circle cx="12" cy="12" r="6"></circle>
-                                <circle cx="12" cy="12" r="2"></circle>
-                                <line x1="12" y1="12" x2="18" y2="4"></line>
-                            </svg>
-                        </div>
-                        <h5 class="fw-bold mb-2">PoV Radar</h5>
-                        <p class="card-desc">Track TRRs, PoV status, Global Timeline, and direct SFDC links.</p>
-                        <a href="other/povradar.php" class="btn btn-mgmt w-100 fw-bold">Open Tracker</a>
-                    </div>
+                <div class="card tool-card card-mgmt p-4 text-center">
+                    <div class="card-icon" style="color: var(--mgmt-color);"><i class="fas fa-bullseye"></i></div>
+                    <h5 class="fw-bold mb-2">PoV Radar</h5>
+                    <p class="card-desc">Track TRRs and PoV status globally.</p>
+                    <a href="other/povradar.php" class="btn btn-dark w-100 fw-bold">Open Tracker</a>
                 </div>
             </div>
         </div>
     </div>
-
 </div>
 
 <footer class="text-center py-4 text-muted small border-top mt-5">
