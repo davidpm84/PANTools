@@ -233,23 +233,24 @@ if ($plat === 'mac') {
 
 
     // ✅ LINUX: matriz propia (la tuya)
+    // ✅ LINUX: matriz ajustada a la UI moderna de Cortex XDR
     if ($plat === 'linux') {
         return [
             ['section' => 'File Examination'],
 
             ['label' => 'ELF Execution Examination',         'kind' => 'mode', 'module' => ['examineELFs']],
             ['label' => 'Loaded Kernel Modules Examination', 'kind' => 'mode', 'module' => ['examineLoadedKMs']],
-            ['label' => 'ELF Loading Examination',           'kind' => 'mode', 'module' => ['examineELFLoading']],
+            // Añadimos el LTEE que sí sale en la Web
+            ['label' => 'Local File Threat Examination',     'kind' => 'mode', 'module' => ['ltee', 'localFileThreatExamination']],
 
-            ['label' => 'On-write File Examination',         'kind' => 'mode', 'module' => ['onWriteProtection']],
-
-            ['label' => 'On-write: ELF files', 'kind' => 'value',
+            // Quitamos la genérica de On-write y dejamos solo las 3 que se ven en la UI
+            ['label' => 'On-write: ELF files', 'kind' => 'value', 
                 'module' => 'examineELFs', 'field' => 'onWriteProtection', 'subfield' => 'value'
             ],
-            ['label' => 'On-write: Portable executable files (Windows)', 'kind' => 'value',
+            ['label' => 'On-write: Portable executable files (Windows)', 'kind' => 'value', 
                 'module' => 'examinePortableExecutablesLinux', 'field' => 'onWriteProtection', 'subfield' => 'value'
             ],
-            ['label' => 'On-write: Mach-O files (MacOs)', 'kind' => 'value',
+            ['label' => 'On-write: Mach-O files (MacOs)', 'kind' => 'value', 
                 'module' => 'examineMachoLinux', 'field' => 'onWriteProtection', 'subfield' => 'value'
             ],
 
@@ -1469,29 +1470,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // --- B. EJECUTAR AUDITORÍA DE POLÍTICAS (SI SE SELECCIONÓ) ---
+    // --- B. EJECUTAR AUDITORÍA DE POLÍTICAS (SI SE SELECCIONÓ) ---
     if ($runPolicyAudit) {
         $profilesDB = [];
         $policyMap = [];
 
-        // 1. Cargar Perfiles
-        if (isset($_FILES['profiles_file']) && $_FILES['profiles_file']['error'] === UPLOAD_ERR_OK) {
-            try {
-                $jsonProfiles = processExportFile($_FILES['profiles_file']['tmp_name']);
-                if ($jsonProfiles) {
-                    $pList = $jsonProfiles['data']['profiles'] ?? $jsonProfiles['profiles'] ?? $jsonProfiles['data'] ?? [];
-                    foreach ($pList as $p) {
-                        $pName = $p['name'] ?? $p['profile_name'] ?? null;
-                        if ($pName) $profilesDB[$pName] = $p;
-                    }
+        // ✅ HELPER: Función para extraer y cargar perfiles desde cualquier JSON
+        $loadProfiles = function($json) use (&$profilesDB) {
+            if (!$json) return;
+            $pList = [];
+            
+            if (isset($json['data']['profiles']['profiles']) && is_array($json['data']['profiles']['profiles'])) {
+                $pList = $json['data']['profiles']['profiles']; 
+            } elseif (isset($json['data']['profiles']) && is_array($json['data']['profiles'])) {
+                $pList = $json['data']['profiles']; 
+            } elseif (isset($json['profiles']['profiles']) && is_array($json['profiles']['profiles'])) {
+                 $pList = $json['profiles']['profiles'];
+            } elseif (isset($json['profiles']) && is_array($json['profiles'])) {
+                 $pList = $json['profiles'];
+            } elseif (isset($json['data']) && is_array($json['data']) && !isset($json['data']['rules'])) {
+                 $pList = $json['data'];
+            }
+            
+            foreach ($pList as $p) {
+                $pName = $p['name'] ?? $p['profile_name'] ?? null;
+                $pType = $p['type'] ?? $p['profile_type'] ?? 'UNKNOWN';
+                $pOs   = $p['os'] ?? $p['platform'] ?? 'UNKNOWN';
+                
+                if ($pName) {
+                    $key = $pName . '|' . $pType . '|' . $pOs;
+                    $profilesDB[$key] = $p;
                 }
-            } catch (Exception $e) { $errorMsg = "Profiles Error: " . $e->getMessage(); }
-        }
+            }
+        };
 
-        // 2. Cargar Políticas
+        // 1. Cargar Políticas (Contiene tanto las reglas como los perfiles)
         if (isset($_FILES['policy_file']) && $_FILES['policy_file']['error'] === UPLOAD_ERR_OK) {
             try {
                 $jsonPolicies = processExportFile($_FILES['policy_file']['tmp_name']);
                 if ($jsonPolicies) {
+                    // A) Extraer las políticas
                     $rules = $jsonPolicies['data']['rules'] ?? $jsonPolicies['policies'] ?? [];
                     foreach ($rules as $item) {
                         $pName = $item['NAME'] ?? $item['name'] ?? null;
@@ -1504,11 +1522,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ];
                         }
                     }
+                    // B) Extraer los perfiles incrustados
+                    $loadProfiles($jsonPolicies);
                 }
             } catch (Exception $e) { $errorMsg = "Policies Error: " . $e->getMessage(); }
         }
 
-        // 3. Consultar Endpoints y Cruzar
+        // 2. Consultar Endpoints y Cruzar
         if (empty($errorMsg) && !empty($policyMap)) {
             $xql = "dataset = endpoints | fields assigned_prevention_policy, platform | comp count() as TOTAL by assigned_prevention_policy, platform";
             $rows = runXqlQuery($baseUrl, $headers, $xql);
@@ -1516,6 +1536,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (isset($rows['error'])) {
                 $errorMsg = "Failed to query endpoints: " . $rows['error'];
             } elseif ($rows !== null) {
+                
+                $getProfileData = function($profName, $profType, $profOs) use ($profilesDB) {
+                    if (!$profName || $profName === '-' || $profName === 'N/A' || $profName === 'Default') return null;
+                    
+                    $exactKey = $profName . '|' . $profType . '|' . $profOs;
+                    if (isset($profilesDB[$exactKey])) return $profilesDB[$exactKey];
+                    
+                    foreach ($profilesDB as $key => $pData) {
+                        $parts = explode('|', $key);
+                        if (count($parts) >= 2 && $parts[0] === $profName && $parts[1] === $profType) return $pData;
+                    }
+                    
+                    foreach ($profilesDB as $key => $pData) {
+                        $parts = explode('|', $key);
+                        if ($parts[0] === $profName) return $pData;
+                    }
+                    return null;
+                };
+
+                // Array para ir guardando los nombres de políticas en uso
+                $usedPolicyNames = [];
+
                 foreach ($rows as $row) {
                     $polName = $row['assigned_prevention_policy'] ?? '';
                     $platName = $row['platform'] ?? 'Unknown';
@@ -1524,14 +1566,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (empty($polName)) $polName = "[No Policy]";
                     $mapped = $policyMap[$polName] ?? null;
 
+                    if ($polName !== "[No Policy]") {
+                        $usedPolicyNames[] = $polName; // Lo guardamos para la resta luego
+                    }
+
+                    $policyOs = $mapped['platform'] ?? 'Unknown';
+
                     $resultData[] = [
                         'policy' => $polName,
                         'platform' => $platName,
                         'count' => $count,
                         'profiles' => [
-                            'Malware' => ['name' => $mapped['malware'] ?? '-', 'data' => $profilesDB[$mapped['malware'] ?? ''] ?? null],
-                            'Exploit' => ['name' => $mapped['exploit'] ?? '-', 'data' => $profilesDB[$mapped['exploit'] ?? ''] ?? null],
-                            'Agent Settings' => ['name' => $mapped['agent'] ?? '-', 'data' => $profilesDB[$mapped['agent'] ?? ''] ?? null]
+                            'Malware' => [
+                                'name' => $mapped['malware'] ?? '-', 
+                                'data' => $getProfileData($mapped['malware'] ?? '', 'MALWARE', $policyOs)
+                            ],
+                            'Exploit' => [
+                                'name' => $mapped['exploit'] ?? '-', 
+                                'data' => $getProfileData($mapped['exploit'] ?? '', 'EXPLOIT', $policyOs)
+                            ],
+                            'Agent Settings' => [
+                                'name' => $mapped['agent'] ?? '-', 
+                                'data' => $getProfileData($mapped['agent'] ?? '', 'AGENT_SETTINGS', $policyOs)
+                            ]
                         ]
                     ];
                 }
@@ -1542,6 +1599,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($cmp !== 0) return $cmp;
                     return ((int)($b['count']??0)) <=> ((int)($a['count']??0));
                 });
+
+                // ✅ NUEVO: CALCULAR POLÍTICAS HUÉRFANAS (SIN USO)
+                $allPolicyNames = array_keys($policyMap);
+                $orphanedNames = array_diff($allPolicyNames, $usedPolicyNames);
+                
+                $unusedPolicies = [];
+                // Nombres exactos de políticas del sistema que no se pueden borrar
+                $ignoreList = ['Windows Default', 'Linux Default', 'macOS Default']; 
+
+                foreach ($orphanedNames as $oName) {
+                    // Si el nombre de la política está en la lista de ignoradas, pasamos a la siguiente
+                    if (in_array($oName, $ignoreList)) {
+                        continue;
+                    }
+
+                    $unusedPolicies[] = [
+                        'name' => $oName,
+                        'platform' => $policyMap[$oName]['platform'] ?? 'Unknown'
+                    ];
+                }
+                // Ordenar huérfanas por plataforma y nombre
+                usort($unusedPolicies, function($a, $b) {
+                    $cmp = strcmp($a['platform'], $b['platform']);
+                    if ($cmp === 0) return strcmp($a['name'], $b['name']);
+                    return $cmp;
+                });
+
             } else {
                 $errorMsg = "Failed to query endpoints via XQL (Null response).";
             }
@@ -1563,11 +1647,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (modePolicy && modePolicy.checked) {
             fields.style.display = "block";
             document.getElementById("p_file").required = true;
-            document.getElementById("r_file").required = true;
         } else {
             fields.style.display = "none";
             document.getElementById("p_file").required = false;
-            document.getElementById("r_file").required = false;
         }
     }
 
@@ -1876,10 +1958,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <label>4. File: Policy Rules (.export)</label>
             <input type="file" name="policy_file" id="p_file">
         </div>
-        <div class="form-group">
-            <label>5. File: Profiles (.export)</label>
-            <input type="file" name="profiles_file" id="r_file">
-        </div>
+      
     </div>
 
     <button type="submit" class="btn btn-deploy" onclick="validateForm(event)">RUN AUDIT</button>
@@ -2082,7 +2161,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </tbody>
             </table>
         <?php endif; ?>
-    <?php endif; ?>
+
+        <?php if (!empty($unusedPolicies)): ?>
+            <div style="margin-top: 40px; background: #fffcf0; border-left: 5px solid #ffc107; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                <h3 style="color: #b28900; margin-top: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+                    <i class="fas fa-broom"></i> Clean-up Recommendation (Unused Policies)
+                </h3>
+                <p style="color: #555; font-size: 0.95rem; margin-bottom: 20px; line-height: 1.5;">
+                    The following policies exist in the tenant configuration but are <strong>not assigned to any active or disconnected endpoint</strong>. To maintain a clean and secure environment, consider reviewing and deleting these policies if they are no longer needed.
+                </p>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    <?php foreach ($unusedPolicies as $up): 
+                        $plat = strtolower($up['platform']);
+                        $badgeClass = 'plat-unk';
+                        if (strpos($plat, 'win') !== false) $badgeClass = 'plat-win';
+                        elseif (strpos($plat, 'linux') !== false) $badgeClass = 'plat-linux';
+                        elseif (strpos($plat, 'mac') !== false) $badgeClass = 'plat-mac';
+                    ?>
+                        <div style="background: white; border: 1px solid #ffe69c; padding: 8px 15px; border-radius: 6px; font-size: 0.9rem; color: #333; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                            <span class="badge-plat <?php echo $badgeClass; ?>" style="font-size:0.7rem;"><?php echo htmlspecialchars($up['platform']); ?></span>
+                            <strong><?php echo htmlspecialchars($up['name']); ?></strong>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+        <?php endif; ?>
 </div>
 
 </body>
