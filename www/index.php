@@ -124,6 +124,8 @@ if (isset($_POST['action']) && $_POST['action'] === 'save_setup') {
     $ch = curl_init("https://api.github.com/user");
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["User-Agent: PANTools", "Authorization: token $token"]);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
     curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
