@@ -26,6 +26,7 @@ if (!isset($_SESSION['last_version_check']) || (time() - $_SESSION['last_version
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["User-Agent: PANTools-Hub"]);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
     $response = curl_exec($ch);
     $ghData = json_decode($response, true);
     curl_close($ch);
@@ -62,7 +63,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'self_update' && isset($_SES
     $extractPath = "/tmp/pantools_extract";
 
     // Descargar (falla si no es 200)
-    $cmdDownload = "curl -fL -s -o " . escapeshellarg($tarFile) . " " . escapeshellarg($tarUrl) . " 2>&1";
+    $cmdDownload = "curl -fL -k -s -o " . escapeshellarg($tarFile) . " " . escapeshellarg($tarUrl) . " 2>&1";
     exec($cmdDownload, $outDl, $retDl);
 
     if ($retDl !== 0 || !file_exists($tarFile) || filesize($tarFile) < 1000) {
