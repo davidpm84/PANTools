@@ -4,7 +4,8 @@
     "date": "2026-03-10",
     "features": [
       "Added the ability to download in PDF format, as well as adding the type of report to download to the file name.",
-      "Fix in the API query for unknown datasets."
+      "Fix in the API query for unknown datasets.",
+      "Bug in PoVRadar. Removed closed state in the forecast."
     ]
   },
   {
