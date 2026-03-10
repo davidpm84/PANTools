@@ -875,7 +875,7 @@ function renderSidebarStats() {
                 let points = 0; let count = 0;
                 trrList.forEach(item => {
                     if ((item.ownerName || 'Unassigned') !== owner) return;
-                    if (['Parked', 'Not Started'].includes(item.projectStatus)) return;
+                    if (['Parked', 'Not Started', 'Closed'].includes(item.projectStatus)) return;
                     const pStart = new Date(item.startDate);
                     const pEnd = new Date(item.endDate);
                     if (pStart <= week.end && pEnd >= week.start) {
