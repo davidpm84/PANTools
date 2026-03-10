@@ -5,7 +5,7 @@ ini_set('memory_limit', '512M');
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 // --- VERSIONADO ---
-$toolVersion = "v1.0 (10 Feb 2026)";
+$toolVersion = "v1.1 (10 March 2026)";
 $compatibilityMsg = "Supports: Cortex XDR 5.0 & XSIAM 3.4 and lower";
 
 $resultData = [];      // Datos de Policy Audit
@@ -595,14 +595,17 @@ function runXqlQuery($baseUrl, $headers, $query) {
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     $rawStart = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE); // ✅ 1. Capturamos el código HTTP
     $startRes = json_decode($rawStart, true);
     curl_close($ch);
-
-    // Si falla el inicio, devolvemos el error crudo
-    if (!isset($startRes['reply']) || !is_string($startRes['reply'])) {
+    // Si falla el inicio o el servidor devuelve un error 4xx/5xx
+    if ($httpCode >= 400 || !isset($startRes['reply']) || !is_string($startRes['reply'])) {
         $errMsg = $startRes['reply']['err_msg'] ?? json_encode($startRes);
-        return ['error' => "Start Failed: " . substr($errMsg, 0, 200)];
+        // ✅ 2. Añadimos el código HTTP al texto del error
+        return ['error' => "HTTP $httpCode: Start Failed: " . substr($errMsg, 0, 200)];
     }
+
+   
 
     $queryId = $startRes['reply'];
     sleep(4);
@@ -1427,11 +1430,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = runXqlQuery($baseUrl, $headers, $check['query']);
 
             // --- EXCEPCIÓN: DATASET UNKNOWN INEXISTENTE ---
-            // Si la query falla y es la de "Misconfigured Data Sources",
-            // asumimos que el dataset no existe porque no hay logs de ese tipo (es algo bueno).
             if (isset($result['error']) && strpos($check['name'], 'Misconfigured Data Sources') !== false) {
-                // Forzamos resultado vacío para que el validador diga "OK - 0 logs"
-                $result = []; 
+                // Si el error contiene "HTTP 400", es porque la query falló por sintaxis/dataset inexistente. Forzamos OK.
+                // Si es HTTP 401, 403, 404, explotará y se pondrá en negro.
+                if (strpos($result['error'], 'HTTP 400') !== false) {
+                    $result = []; 
+                }
             }
             // ----------------------------------------------
 
@@ -1662,24 +1666,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             alert("Please select one action (Health Checks OR Policy Audit).");
         }
     }
-    // ... tus funciones existentes (togglePolicyFields, validateForm) ...
 
-  function downloadReport() {
-        const content = document.querySelector('.main-content').innerHTML;
-        const date = new Date();
-        const dateStr = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}-${date.getDate()}`;
-        
-        // --- NUEVO: Obtener nombre del cliente desde PHP incrustado o del DOM ---
-        // Buscamos el elemento donde pintamos el nombre para usarlo en el fichero
+    // Leemos el modo actual desde PHP y lo pasamos al JS
+    const currentMode = "<?php echo isset($mode) ? ($mode === 'health' ? 'healthchecks' : 'policyaudit') : 'audit'; ?>";
+
+    function getFilenameBase() {
         let clientName = "Customer";
         const clientEl = document.getElementById('client-name-display');
         if (clientEl && clientEl.innerText.trim() !== "") {
-            clientName = clientEl.innerText.trim().replace(/[^a-zA-Z0-9]/g, '_'); // Limpiar caracteres raros
+            clientName = clientEl.innerText.trim().replace(/[^a-zA-Z0-9]/g, '_'); 
         }
+        const dateStr = new Date().toISOString().split('T')[0];
+        
+        // Ahora el nombre incluye el modo dinámicamente
+        return `Cortex_Audit_${clientName}_${dateStr}_${currentMode}`;
+    }
 
-        // Construir nombre: Cortex_Audit_NombreCliente_Fecha.html
-        const filename = `Cortex_Audit_${clientName}_${dateStr}.html`;
-
+    function downloadReport() {
+        const content = document.querySelector('.main-content').innerHTML;
+        const filename = getFilenameBase() + ".html";
         const styles = document.querySelector('style').innerHTML;
         
         const htmlContent = `
@@ -1687,13 +1692,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <html lang="en">
             <head>
                 <meta charset="UTF-8">
-                <title>Cortex Audit Report - ${clientName}</title>
+                <title>Cortex Audit Report - ${getFilenameBase()}</title>
                 <style>
                     ${styles}
                     body { background: #fff; display: block; margin: 20px; font-family: 'Segoe UI', sans-serif; }
                     .main-content { padding: 0; box-shadow: none; }
-                    .export-btn-container { display: none; }
-                    /* Asegurar que el header del reporte se vea bien impreso */
+                    .export-btn-group { display: none; }
                     .report-header { border-bottom: 2px solid #005fdb; padding-bottom: 15px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
                 </style>
             </head>
@@ -1715,6 +1719,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
+
+    
+
     </script>
 
     <style>
@@ -1915,6 +1922,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     /* Si prefieres azul, usa: #00C0F3 */
     font-weight: 400;       /* Más fino para diferenciar las dos palabras */
 }
+.export-btn-group {
+            display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 20px;
+        }
+        .btn-html { background: #607d8b; } .btn-html:hover { background: #455a64; }
+        .btn-pdf { background: #d32f2f; } .btn-pdf:hover { background: #b71c1c; }
+
+        /* MAGIA PARA EL PDF (Oculta la barra lateral y ajusta el fondo) */
+        @media print {
+            /* ESTO FUERZA A IMPRIMIR LOS COLORES DE FONDO SIN MARCAR LA CASILLA */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .sidebar { display: none !important; }
+            .export-btn-group { display: none !important; }
+            body { background: white !important; display: block !important; height: auto !important; }
+            .main-content { background: white !important; padding: 0 !important; width: 100% !important; overflow: visible !important; height: auto !important;}
+            .report-header { margin-top: 0 !important; padding-top: 0 !important; }
+            /* Evitar que las tablas se corten a la mitad de una página */
+            tr { page-break-inside: avoid; }
+            details { border: 1px solid #ddd; }
+        }
     </style>
 </head>
 <body>
@@ -1981,8 +2011,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <span id="client-name-display"><?php echo htmlspecialchars($customerName); ?></span>
             </div>
         </div>
-        <div class="export-btn-container" style="margin-bottom: 10px; text-align: right;">
-            <button onclick="downloadReport()" class="export-btn">📥 Download Report</button>
+        <div class="export-btn-group">
+            <button onclick="window.print()" class="export-btn btn-pdf"><i class="fas fa-file-pdf"></i> Save as PDF</button>
+            <button onclick="downloadReport()" class="export-btn btn-html"><i class="fas fa-file-code"></i> Download HTML</button>
         </div>
     <?php endif; ?>
 
