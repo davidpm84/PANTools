@@ -162,6 +162,96 @@ function uploadCorrelationRulesViaApi($filePath, $baseUrl, $apiKey, $authId) {
     return ["success" => $globalSuccess];
 }
 
+function uploadDashboardViaApi($filePath, $baseUrl, $apiKey, $authId) {
+    global $outputLog;
+
+    $baseUrl = rtrim($baseUrl, '/');
+    $baseUrl = str_replace('/xsoar', '', $baseUrl);
+    $endpoint = "$baseUrl/public_api/v1/dashboards/insert";
+
+    $jsonContent = file_get_contents($filePath);
+    $data = json_decode($jsonContent, true);
+
+    if (!$data) {
+        $outputLog .= "   ❌ Dashboard JSON inválido o vacío.\n";
+        return ["success" => false];
+    }
+
+    // La doc muestra request_data como objeto en el esquema,
+    // pero el ejemplo oficial de request lo envía como ARRAY.
+    // Para este endpoint, usamos el formato del ejemplo oficial.
+    if (isset($data['request_data'])) {
+        $payloadData = $data;
+    } elseif (isset($data['dashboards_data'])) {
+        $payloadData = [
+            "request_data" => [[
+                "dashboards_data" => $data['dashboards_data'],
+                "widgets_data" => $data['widgets_data'] ?? []
+            ]]
+        ];
+    } else {
+        $outputLog .= "   ❌ Formato de dashboard no soportado. Falta dashboards_data.\n";
+        return ["success" => false];
+    }
+
+    $payload = json_encode($payloadData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    $outputLog .= "   ↳ Endpoint: $endpoint\n";
+    $outputLog .= "   ↳ Payload size: " . strlen($payload) . " bytes\n";
+    // opcional para depurar:
+    // $outputLog .= "   ↳ Payload: $payload\n";
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $endpoint);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Accept: application/json",
+        "Content-Type: application/json",
+        "Authorization: $apiKey",
+        "x-xdr-auth-id: $authId"
+    ]);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErr) {
+        $outputLog .= "   ❌ Dashboard API error de red/timeout: $curlErr\n";
+        return ["success" => false];
+    }
+
+    if ($httpCode >= 200 && $httpCode < 300) {
+        $outputLog .= "   ✅ Dashboard subido por API\n";
+        $outputLog .= "   ↳ HTTP $httpCode\n";
+        $outputLog .= "   ↳ Respuesta: $response\n";
+        return ["success" => true];
+    }
+
+    $errMsg = $response;
+    $jsonErr = json_decode($response, true);
+
+    if (isset($jsonErr['reply']['err_msg'])) {
+        $errMsg = $jsonErr['reply']['err_msg'];
+    } elseif (isset($jsonErr['err_msg'])) {
+        $errMsg = $jsonErr['err_msg'];
+    } elseif (isset($jsonErr['errors'][0]['error'])) {
+        $errMsg = $jsonErr['errors'][0]['error'];
+    } elseif (isset($jsonErr['errors'][0]['status'])) {
+        $errMsg = $jsonErr['errors'][0]['status'];
+    }
+
+    $outputLog .= "   ❌ Dashboard API error ($httpCode): $errMsg\n";
+    $outputLog .= "   ↳ Respuesta RAW: $response\n";
+    return ["success" => false];
+}
+
 // --- HELPER SDK ---
 function prepareFileForSdk($originalPath) {
     $tempBaseDir = '/tmp/xsiam_builder/' . uniqid();
@@ -357,38 +447,65 @@ if (isset($_POST['action']) && $_POST['action'] === 'deploy') {
     $selectedFiles = $_POST['selected_files'] ?? [];
     $outputLog = "--- STARTING DEPLOYMENT --- \n"; $successCount = 0;
 
+    
     foreach ($selectedFiles as $file) {
-        $realPath = $localRepoPath . '/' . $file;
-        $outputLog .= "\n📂 " . basename($file);
-        if (stripos(dirname($realPath), 'Correlation') !== false) {
-            $res = uploadCorrelationRulesViaApi($realPath, $apiUrl, $apiKey, $authId);
-            if ($res['success']) $successCount++; 
-            // El log ya se llena en la función
+    $realPath = $localRepoPath . '/' . $file;
+    $outputLog .= "\n📂 " . basename($file);
+
+    if (stripos(dirname($realPath), 'Correlation') !== false) {
+        $res = uploadCorrelationRulesViaApi($realPath, $apiUrl, $apiKey, $authId);
+        if ($res['success']) {
+            $successCount++;
+        }
+
+    } elseif (stripos(dirname($realPath), 'Dashboards') !== false) {
+        $res = uploadDashboardViaApi($realPath, $apiUrl, $apiKey, $authId);
+        if ($res['success']) {
+            $successCount++;
+        }
+
+    } elseif (stripos(dirname($realPath), 'Reports') !== false || stripos(dirname($realPath), 'Widgets') !== false) {
+        $sdkPath = prepareFileForSdk($realPath);
+        $packDir = dirname(dirname($sdkPath));
+
+        $cmd = "env DEMISTO_BASE_URL=" . escapeshellarg($apiUrl) .
+               " DEMISTO_API_KEY=" . escapeshellarg($apiKey) .
+               " XSIAM_AUTH_ID=" . escapeshellarg($authId) .
+               " DEMISTO_VERIFY_SSL=false HOME=/tmp demisto-sdk upload -i " .
+               escapeshellarg($packDir) . " -z --xsiam --insecure 2>&1";
+
+        exec($cmd, $outSDK, $retSDK);
+
+        if ($retSDK === 0) {
+            $outputLog .= "   ✅ SDK OK (Zipped Pack)\n";
+            $successCount++;
         } else {
-            $sdkPath = prepareFileForSdk($realPath);
-            
-            // --- FIX: Usamos 'env' para pasar las variables en la misma línea ---
-            $cmd = "env ";
-            $cmd .= "DEMISTO_BASE_URL=" . escapeshellarg($apiUrl) . " ";
-            $cmd .= "DEMISTO_API_KEY=" . escapeshellarg($apiKey) . " ";
-            $cmd .= "XSIAM_AUTH_ID=" . escapeshellarg($authId) . " ";
-            $cmd .= "DEMISTO_VERIFY_SSL=false "; // Evitar error de certificados
-            $cmd .= "HOME=/tmp "; // Evitar error de permisos en /var/www
-            
-            $cmd .= "demisto-sdk upload -i " . escapeshellarg($sdkPath) . " --xsiam --insecure 2>&1";
-            
-            exec($cmd, $outSDK, $retSDK);
-            
-            if ($retSDK === 0) { 
-                $outputLog .= "   ✅ SDK OK\n"; 
-                $successCount++; 
-            } else { 
-                // Mostrar detalle del error
-                $errorDetails = implode("\n", array_slice($outSDK, -10));
-                $outputLog .= "   ❌ ERROR SDK (Code: $retSDK):\n$errorDetails\n"; 
-            }
+            $errorDetails = implode("\n", array_slice($outSDK, -10));
+            $outputLog .= "   ❌ ERROR SDK (Code: $retSDK):\n$errorDetails\n";
+        }
+
+    } else {
+        $sdkPath = prepareFileForSdk($realPath);
+
+        $cmd = "env DEMISTO_BASE_URL=" . escapeshellarg($apiUrl) .
+               " DEMISTO_API_KEY=" . escapeshellarg($apiKey) .
+               " XSIAM_AUTH_ID=" . escapeshellarg($authId) .
+               " DEMISTO_VERIFY_SSL=false HOME=/tmp demisto-sdk upload -i " .
+               escapeshellarg($sdkPath) . " --xsiam --insecure 2>&1";
+
+        exec($cmd, $outSDK, $retSDK);
+
+        if ($retSDK === 0) {
+            $outputLog .= "   ✅ SDK OK\n";
+            $successCount++;
+        } else {
+            $errorDetails = implode("\n", array_slice($outSDK, -10));
+            $outputLog .= "   ❌ ERROR SDK (Code: $retSDK):\n$errorDetails\n";
         }
     }
+}
+
+
     $message = "Deployment process finished. ($successCount/" . count($selectedFiles) . ")"; $messageType = "success";
 }
 
