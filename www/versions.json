@@ -5,7 +5,8 @@
     "features": [
       "Added the ability to download in PDF format, as well as adding the type of report to download to the file name.",
       "Fix in the API query for unknown datasets.",
-      "Bug in PoVRadar. Removed closed state in the forecast."
+      "Bug in PoVRadar. Removed closed state in the forecast.",
+      "Bug in ContentImporter. Now we're able to upload Dashboards correctly."
     ]
   },
   {
