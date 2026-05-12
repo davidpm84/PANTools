@@ -437,7 +437,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'sync') {
         exec("$gitNoVerify clone $safeUrl $safePath 2>&1", $out, $ret);
     }
     
-    $message = ($ret === 0) ? "✅ Repository synchronized." : "❌ Git Error."; 
+    $message = ($ret === 0) ? "✅ Repository synchronized." : "❌ Git Error: " . htmlspecialchars(implode(" | ", $out));    
     $messageType = ($ret === 0) ? "success" : "error";
     $updateAvailable = false;
 }
