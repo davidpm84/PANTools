@@ -132,9 +132,18 @@ if (isset($_POST['action']) && $_POST['action'] === 'save_setup') {
     curl_close($ch);
 
     if ($httpCode === 200) {
+        // 1. Guardar el nuevo token
         $config = ['token' => $token, 'setup_date' => date('Y-m-d H:i:s')];
         file_put_contents($configFile, json_encode($config));
         unset($_SESSION['setup_skipped']);
+        
+        // 2. NUEVO: Borrar el repositorio local para forzar un clone limpio 
+        // Esto evita errores de "token antiguo guardado en config de Git" y conflictos de "divergent branches"
+        $cortexRepoPath = '/var/www/html/cortex/content-repo';
+        if (is_dir($cortexRepoPath)) {
+            exec("rm -rf " . escapeshellarg($cortexRepoPath) . " 2>&1");
+        }
+
         header("Location: " . $_SERVER['PHP_SELF']);
         exit;
     } else {
