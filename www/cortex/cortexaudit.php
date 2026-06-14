@@ -5,8 +5,8 @@ ini_set('memory_limit', '512M');
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 // --- VERSIONADO ---
-$toolVersion = "v1.1 (10 March 2026)";
-$compatibilityMsg = "Supports: Cortex XDR 5.0 & XSIAM 3.4 and lower";
+$toolVersion = "v1.2 (14 June 2026)";
+$compatibilityMsg = "Supports: Cortex XDR 5.1 & XSIAM 3.5 and lower";
 
 $resultData = [];      // Datos de Policy Audit
 $healthResults = [];   // Datos de Health Checks
@@ -899,11 +899,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             ],
 
-            // --- CHECK DE NGFW (INGESTA) ---
+// --- CHECK DE NGFW (INGESTA) ---
             [
                 'name' => 'NGFW Log Ingestion',
                 'desc' => 'Checks if connected Firewalls are sending Traffic and EAL (Enhanced Application Logs) correctly.',
-                'query' => 'config timeframe = 7d | dataset = metrics_source | filter _PRODUCT = "NGFW" | alter ngfw_serial = _device_id | filter array_length(regextract(ngfw_serial, "[A-Za-z]")) = 0 | fields ngfw_serial, _log_type | dedup ngfw_serial, _log_type | comp count(if(_log_type = "traffic", 1, null)) as has_traffic, count(if(_log_type = "eal", 1, null)) as has_eal by ngfw_serial | alter status = if(has_eal > 0 and has_traffic > 0, "OK", if(has_eal > 0 and has_traffic = 0, "FAIL_only_eal", if(has_eal = 0 and has_traffic > 0, "FAIL_only_traffic", "OTHER"))) | alter eal = if(has_eal > 0, "yes", "no") | alter traffic = if(has_traffic > 0, "yes", "no") | fields ngfw_serial, eal, traffic, status | sort asc status, asc ngfw_serial',
+                'query' => 'config timeframe = 1d | dataset = xdr_data | arrayexpand backtrace_identities | filter backtrace_identities -> bundle_id contains "firewall" | alter _vendor = json_extract_scalar(backtrace_identities, "$.vendor"), _product = json_extract_scalar(backtrace_identities, "$.product"), serial = json_extract_scalar(backtrace_identities, "$.serial"), bundle_id = json_extract_scalar(backtrace_identities, "$.bundle_id") | alter log_type = arrayindex(regextract(bundle_id, "(?:clcs\/)?firewall\.([^\/]+)"),0) | filter serial != null and array_length(regextract(serial, "[a-zA-Z]")) = 0 | fields _vendor, _product, serial, log_type | dedup serial, log_type | comp values(log_type) as log_types by serial | alter sending_eal_logs = if(log_types = "eal", "yes", "no") | alter sending_traffic_logs = if(log_types = "traffic", "yes", "no") | alter sending_file_data = if(log_types = "file_data", "yes", "no") | alter sending_threat_logs = if(log_types = "threat", "yes", "no") | alter sending_url_logs = if(log_types = "url", "yes", "no") | alter sending_gp_logs = if(log_types = "globalprotect", "yes", "no")',
                 'validate' => function($rows) {
                     if (empty($rows)) {
                         return ['status' => 'NEUTRAL', 'msg' => 'No NGFW detected (Normal if no firewall is connected)'];
@@ -913,19 +913,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $html = '<div style="margin-top:8px; font-size:0.9em; line-height:1.6;">';
 
                     foreach($rows as $r) {
-                        $sn = htmlspecialchars($r['ngfw_serial'] ?? '-');
-                        $st = $r['status'] ?? 'OTHER';
+                        $sn = htmlspecialchars($r['serial'] ?? '-');
 
-                        if ($st === 'OK') {
-                            $html .= "<div style='color:#2e7d32;'>✔ <strong>$sn</strong>: OK (Traffic + EAL)</div>";
-                        } elseif ($st === 'FAIL_only_traffic') {
-                            $html .= "<div style='color:#c62828;'>✖ <strong>$sn</strong>: Missing EAL Logs!</div>";
+                        $has_eal = ($r['sending_eal_logs'] ?? 'no') === 'yes';
+                        $has_traffic = ($r['sending_traffic_logs'] ?? 'no') === 'yes';
+
+                        // Extra tags para mostrar si envían otros logs
+                        $others = [];
+                        if (($r['sending_threat_logs'] ?? 'no') === 'yes') $others[] = 'Threat';
+                        if (($r['sending_url_logs'] ?? 'no') === 'yes') $others[] = 'URL';
+                        if (($r['sending_file_data'] ?? 'no') === 'yes') $others[] = 'File';
+                        if (($r['sending_gp_logs'] ?? 'no') === 'yes') $others[] = 'GP';
+                        
+                        $other_text = !empty($others) ? ' <span style="color:#888; font-size:0.85em;">[+' . implode(', ', $others) . ']</span>' : '';
+
+                        if ($has_eal && $has_traffic) {
+                            $html .= "<div style='color:#2e7d32;'>✔ <strong>$sn</strong>: OK (Traffic + EAL){$other_text}</div>";
+                        } elseif ($has_traffic && !$has_eal) {
+                            $html .= "<div style='color:#c62828;'>✖ <strong>$sn</strong>: Missing EAL Logs!{$other_text}</div>";
                             $globalStatus = 'WARN';
-                        } elseif ($st === 'FAIL_only_eal') {
-                            $html .= "<div style='color:#c62828;'>✖ <strong>$sn</strong>: Missing Traffic Logs!</div>";
+                        } elseif ($has_eal && !$has_traffic) {
+                            $html .= "<div style='color:#c62828;'>✖ <strong>$sn</strong>: Missing Traffic Logs!{$other_text}</div>";
                             $globalStatus = 'WARN';
                         } else {
-                            $html .= "<div style='color:#777;'>● <strong>$sn</strong>: Passive/Other</div>";
+                            $html .= "<div style='color:#777;'>● <strong>$sn</strong>: Missing Traffic & EAL Logs{$other_text}</div>";
                         }
                     }
                     $html .= '</div>';
@@ -1021,8 +1032,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             [
                 'name' => 'Persistent Upgrade Failures',
                 'desc' => 'Detects endpoints stuck in a failed upgrade loop (3+ attempts in 30 days) and currently failing.',
-                'query' => 'config timeframe = 30d | dataset = agent_auditing | filter agent_auditing_type = ENUM.AGENT_AUDIT_INSTALLATION and agent_auditing_subtype = ENUM.AGENT_AUDIT_UPGRADE and agent_auditing_result = ENUM.AGENT_AUDIT_FAIL | comp count(endpoint_id) as endpoint_failure_Count by endpoint_id, endpoint_name | filter endpoint_failure_Count >=3 | alter excessive_upgrade_failures = if(endpoint_id in(dataset = endpoints | filter last_upgrade_status = "FAILED"| fields endpoint_id),true,false) | filter excessive_upgrade_failures = true | join type = left (dataset = endpoints | alter status_description = arraystring(arraydistinct(arraymap(json_extract_array(operational_status_description , "$."),  json_extract_scalar("@element", "$.reason"))), " , ") | alter detailed_description = arraystring(arraydistinct(arraymap(json_extract_array(operational_status_description , "$."),  json_extract_scalar("@element", "$.title"))), " , ") | fields endpoint_name, last_upgrade_failure_reason,endpoint_id ) as endpoint_fields endpoint_fields.endpoint_id = endpoint_id',
-                'validate' => function($rows) {
+                'query' => 'config timeframe = 30d | dataset = agent_auditing | filter agent_auditing_type = ENUM.AGENT_AUDIT_INSTALLATION and agent_auditing_subtype = ENUM.AGENT_AUDIT_UPGRADE and agent_auditing_result = ENUM.AGENT_AUDIT_FAIL | comp count(endpoint_id) as endpoint_failure_Count by endpoint_id, endpoint_name | filter endpoint_failure_Count >=3 | alter excessive_upgrade_failures = if(endpoint_id in(dataset = endpoints | filter last_upgrade_status = "FAILED"| fields endpoint_id),true,false) | filter excessive_upgrade_failures = true | join type = left (dataset = endpoints | fields endpoint_name, last_upgrade_failure_reason, endpoint_id) as endpoint_fields endpoint_fields.endpoint_id = endpoint_id',                'validate' => function($rows) {
                     if (empty($rows)) {
                         return ['status' => 'OK', 'msg' => 'No persistent upgrade loops detected.'];
                     }
@@ -1220,11 +1230,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ],
             [
     'name' => 'Linux Kernel Module Issues',
-    'desc' => 'Detects Linux endpoints with operational status reasons related to kernel/support and shows a single reason per endpoint.',
-    'query' => 'dataset = endpoints | filter platform = ENUM.LINUX | filter operational_status_description contains "kernel" or operational_status_description contains "supported" | alter reasons = arraydistinct(arraymap(json_extract_array(operational_status_description, "$."), json_extract_scalar("@element", "$.reason"))) | alter reason = arrayindex(reasons, 0) | filter reason != null | fields endpoint_name as name, os_version as os, reason',
+    'desc' => 'Detects Linux endpoints with kernel module operational issues and shows a single kernel-related reason per endpoint.',
+    'query' => 'dataset = endpoints | filter platform = ENUM.LINUX | filter operational_status_description contains "Kernel module incompatibility error" or operational_status_description contains "Linux kernel module failed to load" or operational_status_description contains "Kernel Not Supported" or operational_status_description contains "kernel module" | alter reason = if(operational_status_description contains "Kernel module incompatibility error", "Kernel module incompatibility error", if(operational_status_description contains "Linux kernel module failed to load", "Linux kernel module failed to load", if(operational_status_description contains "Kernel Not Supported", "Kernel Not Supported", "Linux kernel module issue"))) | dedup endpoint_name | fields endpoint_name as name, os_version as os, reason',
     'validate' => function($rows) {
         if (empty($rows)) {
-            return ['status' => 'OK', 'msg' => 'No Linux kernel/support operational issues detected.'];
+            return ['status' => 'OK', 'msg' => 'No Linux kernel module operational issues detected.'];
         }
 
         $count = count($rows);
@@ -1254,7 +1264,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         return [
             'status' => 'WARN',
-            'msg' => "<strong>$count Linux endpoints</strong> show kernel/support operational issues. See details below ↴",
+            'msg' => "<strong>$count Linux endpoints</strong> show kernel module operational issues. See details below ↴",
             'detail_html' => $html
         ];
     }
