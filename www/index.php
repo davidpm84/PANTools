@@ -23,7 +23,7 @@ if (file_exists($configFile)) {
 
 function validateGithubPat(string $pat): bool
 {
-    $ch = curl_init('https://api.github.com/user');
+    $ch = curl_init('https://api.github.com/repos/davidpm84/cortexcustomintegrations');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_HTTPHEADER     => ['User-Agent: PANTools-Hub', "Authorization: token $pat"],
@@ -190,7 +190,7 @@ if ($action === 'login') {
             header('Location: ' . $_SERVER['PHP_SELF']);
             exit;
         }
-        $loginError = 'Invalid GitHub PAT (API check failed).';
+        $loginError = 'Invalid GitHub PAT or insufficient repository access.';
     } elseif ($pass !== '') {
         $tok = decodeAccessToken($pass);
         if ($tok !== null && validateGithubPat($tok['pat'])) {
@@ -458,48 +458,151 @@ $iconCatalogue = [
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
+        /* ── Variables ── */
         :root {
             --strata-color:  #EA212D;
-            --cortex-color:  #00C55E;
-            --mgmt-color:    #343a40;
-            --partner-color: #6f42c1;
-            --bg-light:      #F8F9FA;
+            --cortex-color:  #00a84f;
+            --mgmt-color:    #4f46e5;
+            --partner-color: #7c3aed;
+            --bg:            #f0f4f8;
+            --bg-card:       #ffffff;
+            --bg-dark:       #0d1728;
+            --border:        rgba(0,0,0,.08);
+            --border-hi:     rgba(0,0,0,.18);
+            --text:          #475569;
+            --text-bright:   #1e293b;
+            --text-dim:      #94a3b8;
         }
-        body { background-color: var(--bg-light); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .navbar { background-color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
-        .navbar-brand { font-weight: 800; font-size: 1.5rem; letter-spacing: -.5px; color: #333 !important; display: flex; align-items: center; }
-        .update-banner { border-radius: 8px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,.1); animation: slideIn .5s ease-out; }
-        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .section-title { position: relative; padding-left: 15px; margin-bottom: 25px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #555; }
-        .section-title::before { content: ''; position: absolute; left: 0; top: 5px; bottom: 5px; width: 5px; border-radius: 2px; }
-        .title-strata::before { background-color: var(--strata-color); }
-        .title-cortex::before { background-color: var(--cortex-color); }
-        .title-mgmt::before   { background-color: var(--mgmt-color); }
-        .tool-card { border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,.02); transition: transform .2s, box-shadow .2s; height: 100%; background: white; border: none; }
-        .tool-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px rgba(0,0,0,.05); }
-        .card-strata { border-top: 4px solid var(--strata-color); }
-        .card-cortex { border-top: 4px solid var(--cortex-color); }
-        .card-mgmt   { border-top: 4px solid var(--mgmt-color); }
-        .card-icon   { font-size: 2.5rem; margin-bottom: 15px; }
-        .card-desc   { font-size: .9rem; color: #6c757d; min-height: 40px; }
-        .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,.65); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(6px); }
-        .btn-strata { background-color: #fff; color: var(--strata-color); border: 1px solid var(--strata-color); }
-        .btn-strata:hover { background-color: var(--strata-color); color: #fff; }
-        .btn-cortex { background-color: #fff; color: var(--cortex-color); border: 1px solid var(--cortex-color); }
-        .btn-cortex:hover { background-color: var(--cortex-color); color: #fff; }
+
+        /* ── Base ── */
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; min-height: 100vh; }
+        h1,h2,h3,h4,h5,h6 { color: var(--text-bright); }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 3px; }
+
+        /* ── Navbar (dark frame) ── */
+        .navbar {
+            background: var(--bg-dark) !important;
+            box-shadow: 0 2px 20px rgba(0,0,0,.2);
+        }
+        .navbar-brand { font-weight: 800; font-size: 1.5rem; letter-spacing: -.5px; color: #fff !important; display: flex; align-items: center; }
+        .navbar-brand span { border-left-color: rgba(255,255,255,.18) !important; }
+        .navbar .badge.bg-light { background: rgba(255,255,255,.1) !important; color: #c4b5fd !important; border-color: rgba(255,255,255,.18) !important; }
+        .navbar .badge.bg-success { background: #059669 !important; }
+        .navbar .btn-outline-secondary { border-color: rgba(255,255,255,.25) !important; color: rgba(255,255,255,.75) !important; }
+        .navbar .btn-outline-secondary:hover { background: rgba(255,255,255,.1) !important; color: #fff !important; }
+        .navbar .btn-link.text-danger { color: #f87171 !important; }
+        .navbar .badge-partner { background-color: var(--partner-color) !important; }
+
+        /* ── Login ── */
+        .login-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-dark); z-index: 9999;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .login-overlay::before, .login-overlay::after {
+            content: ''; position: absolute; border-radius: 50%;
+            filter: blur(80px); pointer-events: none;
+            animation: drift 10s ease-in-out infinite alternate;
+        }
+        .login-overlay::before {
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(0,168,79,.18), transparent 70%);
+            top: -100px; left: -100px;
+        }
+        .login-overlay::after {
+            width: 420px; height: 420px;
+            background: radial-gradient(circle, rgba(234,33,45,.14), transparent 70%);
+            bottom: -90px; right: -90px; animation-delay: -5s;
+        }
+        @keyframes drift { from { transform: translate(0,0); } to { transform: translate(40px,30px); } }
+
+        .login-card {
+            background: rgba(21,34,58,.88) !important;
+            border: 1px solid rgba(255,255,255,.12) !important;
+            border-radius: 20px !important;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 24px 60px rgba(0,0,0,.5) !important;
+            position: relative; z-index: 1; color: #e2e8f0;
+        }
+        .login-card h3, .login-card p { color: inherit; }
+        .login-card .text-muted { color: #94a3b8 !important; }
+        .login-card .form-control {
+            background: rgba(255,255,255,.08) !important; border: 1px solid rgba(255,255,255,.14) !important; color: #f1f5f9 !important;
+        }
+        .login-card .form-control:focus { background: rgba(255,255,255,.13) !important; border-color: rgba(255,255,255,.3) !important; box-shadow: 0 0 0 3px rgba(255,255,255,.06) !important; }
+        .login-card .form-control::placeholder { color: #64748b !important; }
+        .login-card .alert-danger { background: rgba(234,33,45,.15) !important; border-color: rgba(234,33,45,.4) !important; color: #fca5a5 !important; }
+
+        /* ── Section titles ── */
+        .section-title {
+            position: relative; padding-left: 18px;
+            margin-bottom: 24px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1.5px;
+            font-size: .78rem; color: #94a3b8;
+        }
+        .section-title span.text-muted { font-size: .85rem !important; letter-spacing: 0; text-transform: none; color: #94a3b8 !important; }
+        .section-title::before {
+            content: ''; position: absolute;
+            left: 0; top: 50%; transform: translateY(-50%);
+            width: 7px; height: 7px; border-radius: 50%;
+        }
+        .title-strata::before { background: var(--strata-color); box-shadow: 0 0 8px rgba(234,33,45,.5); }
+        .title-cortex::before { background: var(--cortex-color); box-shadow: 0 0 8px rgba(0,168,79,.5); }
+        .title-mgmt::before   { background: var(--mgmt-color);   box-shadow: 0 0 8px rgba(79,70,229,.5); }
+
+        /* ── Tool cards ── */
+        .tool-card {
+            background: var(--bg-card) !important; border: 1px solid var(--border) !important;
+            border-radius: 14px !important; height: 100%;
+            box-shadow: 0 2px 8px rgba(0,0,0,.06);
+            transition: transform .28s cubic-bezier(.34,1.56,.64,1), box-shadow .28s, border-color .2s;
+        }
+        .tool-card:hover { transform: translateY(-6px); border-color: var(--border-hi) !important; }
+        .card-strata { border-left: 3px solid var(--strata-color) !important; }
+        .card-cortex { border-left: 3px solid var(--cortex-color) !important; }
+        .card-mgmt   { border-left: 3px solid var(--mgmt-color)   !important; }
+        .card-strata:hover { box-shadow: 0 16px 40px rgba(234,33,45,.12), 0 2px 8px rgba(0,0,0,.06) !important; }
+        .card-cortex:hover { box-shadow: 0 16px 40px rgba(0,168,79,.12),  0 2px 8px rgba(0,0,0,.06) !important; }
+        .card-mgmt:hover   { box-shadow: 0 16px 40px rgba(79,70,229,.12), 0 2px 8px rgba(0,0,0,.06) !important; }
+
+        .card-icon    { font-size: 2.2rem; margin-bottom: 14px; }
+        .card-desc    { font-size: .88rem; color: #64748b; min-height: 40px; }
+        .card-creator { font-size: .75rem; color: #94a3b8; margin-bottom: .5rem; }
+        .card-expired { opacity: .5; }
+        .card-expired .card-icon { filter: grayscale(1); }
+
+        /* ── Buttons ── */
+        .btn-strata { background: #fff; color: var(--strata-color); border: 1px solid rgba(234,33,45,.3); transition: all .2s; }
+        .btn-strata:hover { background: var(--strata-color); color: #fff; box-shadow: 0 4px 14px rgba(234,33,45,.3); }
+
+        .btn-cortex { background: #fff; color: var(--cortex-color); border: 1px solid rgba(0,168,79,.3); transition: all .2s; }
+        .btn-cortex:hover { background: var(--cortex-color); color: #fff; box-shadow: 0 4px 14px rgba(0,168,79,.3); }
+
+        .btn-mgmt {
+            display: block; text-align: center; width: 100%;
+            padding: .375rem .75rem; border-radius: .375rem; font-weight: 700; text-decoration: none;
+            background: #fff; color: var(--mgmt-color);
+            border: 1px solid rgba(79,70,229,.3); transition: all .2s;
+        }
+        .btn-mgmt:hover { background: var(--mgmt-color); color: #fff; box-shadow: 0 4px 14px rgba(79,70,229,.3); }
+
+        /* ── Update banner ── */
+        .update-banner { border-radius: 12px !important; animation: slideIn .4s ease-out; }
+        @keyframes slideIn { from { transform: translateY(-12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .border-se { border-left: 3px solid var(--cortex-color) !important; }
         .badge-partner { background-color: var(--partner-color) !important; }
-        .border-se { border-left: 4px solid var(--cortex-color) !important; }
-        .admin-header { background: linear-gradient(135deg, #343a40, #495057); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; }
-        /* Icon picker */
+
+        /* ── Admin ── */
+        .admin-header { background: linear-gradient(135deg, #0f1e34, #1a2d48); border-radius: 12px; margin-bottom: 2rem; padding: 1.25rem 1.75rem; color: #fff; }
+        .admin-header * { color: #fff !important; }
+
+        /* ── Icon picker ── */
         .icon-picker { display: flex; flex-wrap: wrap; gap: 6px; }
         .icon-option input[type="radio"] { display: none; }
-        .icon-btn { display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 6px; border: 2px solid #dee2e6; cursor: pointer; font-size: 1.1rem; color: #495057; transition: border-color .12s, background .12s, color .12s; }
+        .icon-btn { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; border: 1px solid #dee2e6; cursor: pointer; font-size: 1rem; color: #6c757d; transition: all .12s; }
         .icon-btn:hover { border-color: #6c757d; background: #f8f9fa; }
-        .icon-option input[type="radio"]:checked + .icon-btn { border-color: #0d6efd; background: #e7f1ff; color: #0d6efd; }
-        /* Dynamic tool expired overlay */
-        .card-expired { opacity: .75; }
-        .card-expired .card-icon { filter: grayscale(1); }
-        .card-creator { font-size: .78rem; color: #9ca3af; margin-bottom: .5rem; }
+        .icon-option input[type="radio"]:checked + .icon-btn { border-color: var(--mgmt-color); background: rgba(79,70,229,.08); color: var(--mgmt-color); }
     </style>
 </head>
 <body>
@@ -507,9 +610,9 @@ $iconCatalogue = [
 <?php if (!$isAuth): ?>
 <!-- LOGIN OVERLAY -->
 <div class="login-overlay">
-    <div class="card shadow-lg p-4" style="max-width:440px;width:100%;border:none;border-radius:16px;">
+    <div class="card login-card p-4" style="max-width:440px;width:100%;">
         <div class="text-center mb-4">
-            <div class="mb-3" style="font-size:3rem;">🛡️</div>
+            <div class="mb-3" style="font-size:2.8rem;filter:drop-shadow(0 0 18px rgba(0,197,94,.5));">🛡️</div>
             <h3 class="fw-bold mb-1">PANTools</h3>
             <p class="text-muted small mb-0">Enter your access code to continue</p>
         </div>
@@ -518,7 +621,7 @@ $iconCatalogue = [
         <?php endif; ?>
         <form method="POST">
             <div class="mb-3">
-                <input type="password" name="password" class="form-control form-control-lg bg-light"
+                <input type="password" name="password" class="form-control form-control-lg"
                        placeholder="Access code..." required autofocus autocomplete="off">
             </div>
             <button type="submit" name="action" value="login" class="btn btn-dark w-100 fw-bold py-2">
@@ -531,10 +634,11 @@ $iconCatalogue = [
 
 <!-- NAVBAR -->
 <nav class="navbar navbar-expand-lg navbar-light py-3">
-    <div class="container d-flex justify-content-between align-items-center">
+    <div class="container position-relative d-flex align-items-center">
+        <!-- Left -->
         <div class="d-flex align-items-center">
             <a class="navbar-brand m-0" href="<?= $_SERVER['PHP_SELF'] ?>">
-                <span style="border-left:2px solid #ddd;padding-left:15px;">PANTools</span>
+                <span style="border-left:2px solid rgba(255,255,255,.12);padding-left:15px;">PANTools</span>
             </a>
             <?php if ($isAuth): ?>
             <a href="#" data-bs-toggle="modal" data-bs-target="#changelogModal"
@@ -545,8 +649,18 @@ $iconCatalogue = [
             <?php endif; ?>
         </div>
 
+        <!-- Center -->
         <?php if ($isAuth): ?>
-        <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div class="position-absolute start-50 translate-middle-x text-center">
+            <span class="text-white fw-semibold" style="font-size:.9rem;letter-spacing:-.2px;opacity:.85;">
+                <?= $isPartner ? 'Partner Solutions Hub' : 'Solution Engineering Hub' ?>
+            </span>
+        </div>
+        <?php endif; ?>
+
+        <!-- Right -->
+        <?php if ($isAuth): ?>
+        <div class="d-flex align-items-center gap-3 flex-wrap ms-auto">
             <?php if ($patExpiry && $patExpiry['status'] !== 'ok'): ?>
             <span class="badge bg-<?= $patExpiry['class'] ?> <?= $patExpiry['class'] === 'warning' ? 'text-dark' : '' ?>">
                 <i class="fas fa-<?= $patExpiry['status'] === 'expired' ? 'exclamation-triangle' : 'clock' ?> me-1"></i>
@@ -578,14 +692,13 @@ $iconCatalogue = [
 <div class="container mt-4 mb-5">
 
     <div class="admin-header">
-        <div class="d-flex align-items-center justify-content-between">
-            <div>
-                <h2 class="fw-bold mb-1"><i class="fas fa-cog me-2"></i>PANTools Admin</h2>
-                <p class="mb-0 opacity-75 small">Generate tokens and load tool repositories</p>
-            </div>
-            <a href="<?= $_SERVER['PHP_SELF'] ?>" class="btn btn-outline-light btn-sm fw-bold">
-                <i class="fas fa-arrow-left me-1"></i>Back to Hub
+        <div class="d-flex align-items-center gap-3">
+            <a href="<?= $_SERVER['PHP_SELF'] ?>" class="btn btn-outline-light btn-sm fw-bold flex-shrink-0">
+                <i class="fas fa-arrow-left me-1"></i>Back
             </a>
+            <div>
+                <h5 class="fw-bold mb-0"><i class="fas fa-cog me-2 opacity-75"></i>PANTools Admin</h5>
+            </div>
         </div>
     </div>
 
@@ -634,7 +747,7 @@ $iconCatalogue = [
 
         <!-- Token Generator -->
         <div class="col-lg-7">
-            <div class="card border-0 shadow-sm h-100" style="border-top:4px solid #343a40 !important;">
+            <div class="card border-0 shadow-sm h-100" style="border-top:3px solid var(--mgmt-color) !important;">
                 <div class="card-header bg-dark text-white fw-bold py-3">
                     <i class="fas fa-key me-2"></i>Token Generator
                 </div>
@@ -729,7 +842,7 @@ $iconCatalogue = [
 
         <!-- Bulk Load -->
         <div class="col-lg-5">
-            <div class="card border-0 shadow-sm" style="border-top:4px solid #6c757d !important;">
+            <div class="card border-0 shadow-sm" style="border-top:3px solid var(--border-hi) !important;">
                 <div class="card-header bg-secondary text-white fw-bold py-3">
                     <i class="fas fa-layer-group me-2"></i>Bulk Tool Load
                 </div>
@@ -839,18 +952,6 @@ $iconCatalogue = [
     </div>
     <?php endif; ?>
 
-    <!-- Hero -->
-    <div class="row text-center mb-5">
-        <div class="col-lg-8 mx-auto">
-            <?php if ($isPartner): ?>
-            <h1 class="fw-bold"><span style="color:var(--partner-color);">Partner</span> Solutions Hub</h1>
-            <?php else: ?>
-            <h1 class="fw-bold">Solution Engineering Hub</h1>
-            <?php endif; ?>
-            <p class="text-muted">Select a tool to get started</p>
-        </div>
-    </div>
-
     <!-- STRATA -->
     <div class="mb-5">
         <h4 class="section-title title-strata">STRATA <span class="text-muted fs-6 fw-normal">(NGFW & SASE Tools)</span></h4>
@@ -933,7 +1034,7 @@ $iconCatalogue = [
                     <div class="card-icon" style="color:var(--mgmt-color);"><i class="fas fa-bullseye"></i></div>
                     <h5 class="fw-bold mb-2">PoV Radar</h5>
                     <p class="card-desc">Track TRRs, PoV status, Global Timeline, and direct SFDC links.</p>
-                    <a href="other/povradar.php" class="btn btn-dark w-100 fw-bold">Open Tracker</a>
+                    <a href="other/povradar.php" class="btn-mgmt">Open Tracker</a>
                 </div>
             </div>
             <?php foreach (toolsForSection($activeTools, 'management') as $dt):
@@ -948,7 +1049,7 @@ $iconCatalogue = [
                     <h5 class="fw-bold mb-2"><?= htmlspecialchars($dt['name']) ?></h5>
                     <?php if (!empty($dt['creator'])): ?><p class="card-creator">by <?= htmlspecialchars($dt['creator']) ?></p><?php endif; ?>
                     <p class="card-desc"><?= htmlspecialchars($dt['description'] ?? '') ?></p>
-                    <a href="<?= htmlspecialchars($dt['url'] ?? '#') ?>" class="btn btn-dark w-100 fw-bold">Open Tool</a>
+                    <a href="<?= htmlspecialchars($dt['url'] ?? '#') ?>" class="btn-mgmt">Open Tool</a>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -967,8 +1068,8 @@ $iconCatalogue = [
 <div class="modal fade" id="changelogModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-scrollable">
     <div class="modal-content">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title fw-bold"><i class="fas fa-history text-primary me-2"></i>What's New in PANTools</h5>
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="fas fa-history me-2" style="color:var(--mgmt-color);"></i>What's New in PANTools</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body p-4">
@@ -992,7 +1093,7 @@ $iconCatalogue = [
         <?php endforeach; ?>
         <?php endif; ?>
       </div>
-      <div class="modal-footer bg-light">
+      <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm fw-bold" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
