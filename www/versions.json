@@ -1,5 +1,19 @@
 [
   {
+    "version": "v2.0",
+    "date": "2026-06-14",
+    "features": [
+      "New access system with Partner Edition (password) and SE Edition (GitHub PAT or base64 token).",
+      "Dynamic tools hub: deploy tools from private GitHub repos via base64 access tokens with one-click install.",
+      "New Admin Panel: token generator with configurable expiry date, bulk tool loader, and active tools management with delete.",
+      "Tool cards now display the creator name and expiry status badges.",
+      "Cortex Audit: updated compatibility to XDR 5.1 & XSIAM 3.5.",
+      "Cortex Audit: NGFW Log Ingestion check rewritten with new XQL query that now also reports Threat, URL, File, and GlobalProtect log delivery.",
+      "Cortex Audit: Linux policy matrix corrected — Local File Threat Examination (LTEE) replaces ELF Loading Examination to match the current Cortex XDR UI.",
+      "Cortex Audit: XQL error responses now include the HTTP status code for faster diagnosis."
+    ]
+  },
+  {
     "version": "v1.1",
     "date": "2026-03-10",
     "features": [
