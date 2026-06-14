@@ -16,7 +16,7 @@ PANTools has two editions, each with its own login:
 | Edition | Who | Login |
 |---|---|---|
 | **Partner Edition** | Partner SEs | Shared password |
-| **SE Edition** | Palo Alto Networks SEs | GitHub PAT with access to `davidpm84/cortexcustomintegrations` |
+| **SE Edition** | Palo Alto Networks SEs | GitHub PAT with access to Other Tools |
 
 SE Edition users also get access to the **Admin Panel** to generate access tokens and manage deployed tools.
 
