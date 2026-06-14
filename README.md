@@ -1,70 +1,75 @@
-Markdown
-# 🛠️ PANTools - Solution Engineering Hub
+# PANTools
 
 ![Docker](https://img.shields.io/badge/Docker-Supported-2496ED?logo=docker&style=flat-square)
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?logo=php&style=flat-square)
 ![Cortex](https://img.shields.io/badge/Cortex-XDR%20%7C%20XSIAM-00C55E?style=flat-square)
 ![Strata](https://img.shields.io/badge/Strata-NGFW-EA212D?style=flat-square)
 
-**PANTools** is a unified, Dockerized web-based toolkit designed to streamline and automate daily tasks for Solution Engineers (SEs) and Security Architects working with Palo Alto Networks solutions. 
-
-It provides a single pane of glass to access configuration parsers, API deployment tools, health check audits, and management trackers.
+**PANTools** is a Dockerized, web-based toolkit for Solution Engineers and Partners working with Palo Alto Networks solutions. It provides a unified hub to access configuration parsers, API deployment tools, health check audits, and management trackers.
 
 ---
 
-## 🌟 Key Features & Modules
+## Access Model
 
-### 🧱 STRATA Tools
-* **PAN Firewall Mapper**: A powerful configuration parser and hardware sizing tool. Upload a Tech Support File (TSF / `.tgz`), and the mapper will analyze active sessions, policies, NAT rules, EDLs, and decryption metrics, comparing them against a hardware database to recommend the optimal NGFW model.
+PANTools has two editions, each with its own login:
 
-### 🧠 CORTEX Tools
-* **Custom Content Importer**: Seamlessly synchronize custom integrations, playbooks, and correlation rules from a private GitHub repository. Select the desired content and push it directly into any Cortex XDR or XSIAM tenant using the Cortex API and Demisto SDK.
-* **Cortex Health & Audit**: An API-driven Best Practice Assessment (BPA) tool. It runs automated checks to detect unparsed logs, stale endpoints, upgrade loops, and evaluates EDR settings, Malware, and Exploit profiles against security best practices.
+| Edition | Who | Login |
+|---|---|---|
+| **Partner Edition** | Partner SEs | Shared password |
+| **SE Edition** | Palo Alto Networks SEs | GitHub PAT with access to `davidpm84/cortexcustomintegrations` |
 
-### 🎯 MANAGEMENT Tools
-* **PoV Radar**: Track Technical Review Reports (TRRs), Proof of Value (PoV) statuses, and global timelines.
-
----
-
-## 🚀 Built-in OTA Updates
-PANTools includes a built-in **Over-The-Air (OTA) update mechanism**. The Hub automatically checks the GitHub repository for new releases. When a new version is detected, a banner will appear allowing you to seamlessly update the tool with a single click, without needing to rebuild the Docker container manually.
+SE Edition users also get access to the **Admin Panel** to generate access tokens and manage deployed tools.
 
 ---
 
-## ⚙️ Prerequisites
+## Tools
 
-* [Docker](https://docs.docker.com/get-docker/) & Docker Compose installed on your host machine.
-* *(Optional)* A GitHub Personal Access Token (PAT) with `Contents` read permissions if you plan to use the **Content Importer** with a private repository.
+### STRATA — NGFW & SASE
+- **PAN Firewall Mapper** — Upload a Tech Support File (`.tgz`) to parse active sessions, policies, NAT rules, EDLs, and decryption metrics. Recommends the optimal NGFW hardware model from the sizing database.
+
+### CORTEX — XDR & XSIAM
+- **Custom Content Importer** — Sync custom integrations, playbooks, and correlation rules from a private GitHub repository and push them directly into any Cortex XDR or XSIAM tenant via the Cortex API and Demisto SDK.
+- **Cortex Health & Audit** — API-driven Best Practice Assessment (BPA). Runs automated checks for unparsed logs, stale endpoints, upgrade loops, EDR settings, and Malware/Exploit profiles. Compatible with XDR 5.1 & XSIAM 3.5.
+
+### Management — PoV & Tracking
+- **PoV Radar** — Track TRRs, PoV statuses, global timelines, and SFDC links.
+
+### Dynamic Tools (SE Edition)
+SE users can deploy additional tools from private GitHub repositories using base64 access tokens. Tools are installed with a single click and appear as cards in the hub alongside built-in tools.
 
 ---
 
-## 📦 Quick Start & Installation
+## Admin Panel (SE Edition only)
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/davidpm84/PANTools.git
-   cd pantools
-Deploy the container:
-Ensure port 80 is available on your host machine, then run:
+Accessible from the navbar. Allows SE users to:
+- **Generate access tokens** — create base64 tokens with a configurable expiry date to share tools with Partner users.
+- **Bulk tool loader** — deploy multiple tools from private repos at once.
+- **Manage active tools** — view installed tools (with creator and expiry badges) and remove them.
 
-Bash
+---
+
+## Quick Start
+
+**Requirements:** Docker and Docker Compose installed on the host.
+
+```bash
+git clone https://github.com/davidpm84/PANTools.git
+cd PANTools
 docker-compose up -d --build
-Access the Hub:
-Open your web browser and navigate to:
+```
 
-Plaintext
-http://localhost
-(Or the IP address of your server).
+Then open `http://localhost` in your browser.
 
-Initial Setup (Optional):
-Upon first launch, you will be prompted to enter your GitHub PAT. This enables the Cortex Content Importer to pull from private repositories. If you skip this step, the Content Importer will be disabled, but all other tools (like the Firewall Mapper and Cortex Audit) will remain fully functional.
+---
 
-🔒 Security & Data Privacy
-No Cloud Dependency: PANTools runs entirely locally within your Docker environment.
+## Security Notes
 
-Credential Storage: GitHub tokens and configurations are saved locally in a hidden .config.json file inside the Docker volume (config_data/). This file is excluded from version control.
+- Runs entirely within your local Docker environment — no external cloud dependency.
+- GitHub PATs are **never stored**. Only tool metadata (name, creator, expiry) is saved locally in `.tools.json`.
+- Cortex API keys used in the Importer and Audit tools are held in memory only and never written to disk.
 
-API Keys: Cortex API keys used in the Importer or Audit tools are used in-memory during the execution of the PHP scripts and are never stored on the server.
+---
 
-⚠️ Disclaimer
-This project is a community-driven toolkit created for educational and operational assistance purposes. It is not an official Palo Alto Networks product. Use it at your own risk. Always validate configuration changes and API deployments in a non-production environment first.
+## Disclaimer
+
+PANTools is a community-driven toolkit for educational and operational assistance. It is not an official Palo Alto Networks product. Always validate configuration changes and API calls in a non-production environment first.
