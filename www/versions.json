@@ -1,5 +1,21 @@
 [
   {
+    "version": "v2.1",
+    "date": "2026-08-12",
+    "features": [
+      "New tool — TimeTracker: 40h/week working-hours tracker with single-file PHP + SQLite backend, session start/stop with notes, vacations, monthly adjustments, holidays, and configurable per-weekday hours plus intensive-period presets (e.g. summer schedule).",
+      "PoVRadar: brand new Metrics Dashboard is now the default landing view — global filters by date range (Current/Last FY, YTD, current/last quarter, last 90/365 days, all time, custom), product and owner.",
+      "PoVRadar: engagement mix cards (Opportunities / Post Sales / Events), KPI tiles with previous-period deltas, and one-click CSV export of the filtered dataset.",
+      "PoVRadar: new charts — Commercial Outcomes and Technical Outcomes donuts, Tech × Commercial matrix, Won amount by month, Win rate by product, and Loss Reasons distribution.",
+      "PoVRadar: District Breakdown — stacked charts of TRR count and amount per district (Active / Won / Lost / No Decision), plus footer note listing TRRs with no district assigned.",
+      "PoVRadar: Support Activities section — dedicated KPIs and Top-10 accounts (by count and by amount) for Post Sales and Events, split between activity on Opp accounts vs. standalone.",
+      "PoVRadar: new sidebar widgets — TRRs by District and This FY card with Won/Closed counters, Win Rate bar and Won amount.",
+      "PoVRadar: new Quick View filter Outcome Pending with badge counter for closed TRRs still missing commercial outcome.",
+      "PoVRadar: TRR form extended with Technical Outcome (Technical Win / Partial / Technical Loss), District (with autocomplete from existing districts) and a Close Details block that appears when Status = Closed, requiring Actual Close Date, Commercial Outcome, Final Amount (Won) and Loss Reason (Lost).",
+      "PoVRadar: new Fiscal Year Settings entry in the tools menu to configure the FY used across dashboards and widgets."
+    ]
+  },
+  {
     "version": "v2.0",
     "date": "2026-06-14",
     "features": [
