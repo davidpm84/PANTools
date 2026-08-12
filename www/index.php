@@ -275,6 +275,28 @@ if ($action === 'self_update' && isset($_SESSION['remote_hash'])) {
     $tarFile = '/tmp/pantools_update.tar.gz';
     $extPath = '/tmp/pantools_extract';
 
+    // Local data to preserve across updates (relative to www/): SQLite DBs and
+    // per-tool state that must NOT be overwritten by the tarball's shipped copy.
+    // Add here any new tool that stores user data on disk.
+    $preserveRel = [
+        'other/timetracker/data',   // tracker.sqlite + .htaccess
+        'other/rfp-generator/db',   // rfp_data.sqlite (admin password, competitors, products, settings)
+    ];
+    $preservePath = '/tmp/pantools_preserve';
+
+    // Helper: restore snapshot dir → repoPath/rel (used both on success and rollback)
+    $restorePreserved = function() use ($preserveRel, $preservePath, $repoPath) {
+        foreach ($preserveRel as $rel) {
+            $backup = $preservePath . '/' . $rel;
+            if (file_exists($backup)) {
+                $dst = $repoPath . '/' . $rel;
+                exec('rm -rf ' . escapeshellarg($dst));
+                @mkdir(dirname($dst), 0755, true);
+                exec('cp -a ' . escapeshellarg($backup) . ' ' . escapeshellarg($dst));
+            }
+        }
+    };
+
     exec('curl -fL -k -s -o ' . escapeshellarg($tarFile) . ' ' . escapeshellarg($tarUrl) . ' 2>&1', $outDl, $retDl);
     if ($retDl !== 0 || !file_exists($tarFile) || filesize($tarFile) < 1000) {
         $updateError = true; $updateMessage = '❌ Download failed: ' . implode(' ', $outDl);
@@ -289,11 +311,28 @@ if ($action === 'self_update' && isset($_SESSION['remote_hash'])) {
                 $updateError = true;
                 $updateMessage = '❌ "www" not found. Roots: ' . implode(', ', glob($extPath . '/*', GLOB_ONLYDIR));
             } else {
+                // 1) Snapshot local data before overwriting
+                exec('rm -rf ' . escapeshellarg($preservePath) . ' && mkdir -p ' . escapeshellarg($preservePath));
+                foreach ($preserveRel as $rel) {
+                    $src = $repoPath . '/' . $rel;
+                    if (file_exists($src)) {
+                        $dst = $preservePath . '/' . $rel;
+                        @mkdir(dirname($dst), 0755, true);
+                        exec('cp -a ' . escapeshellarg($src) . ' ' . escapeshellarg($dst));
+                    }
+                }
+
+                // 2) Overlay new code
                 exec('cp -a ' . escapeshellarg($wwwDirs[0] . '/.') . ' ' . escapeshellarg($repoPath . '/') . ' 2>&1', $outCp, $retCp);
+
+                // 3) Always restore preserved data (whether cp succeeded or not)
+                $restorePreserved();
+                exec('rm -rf ' . escapeshellarg($preservePath));
+
                 if ($retCp === 0) {
                     $localHash = $_SESSION['remote_hash'];
                     file_put_contents("$repoPath/.version", $localHash);
-                    $updateMessage = '✅ PANTools updated from GitHub!';
+                    $updateMessage = '✅ PANTools updated from GitHub! Local data preserved.';
                     $updateAvailable = false;
                     header('Refresh:2');
                 } else {
