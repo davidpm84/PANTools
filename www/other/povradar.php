@@ -330,8 +330,8 @@
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item" href="#" onclick="openFYSettings()">
-                            <i class="fas fa-calendar-week me-2"></i> Fiscal Year Settings
+                        <a class="dropdown-item" href="#" onclick="openCompSettings()">
+                            <i class="fas fa-euro-sign me-2"></i> Compensation Plan &amp; FY
                         </a>
                     </li>
                     <li>
@@ -506,7 +506,7 @@
                     <div class="card p-3">
                         <div class="mb-3">
                             <h6 class="fw-bold mb-0"><i class="fas fa-map-marker-alt me-1"></i> District Breakdown</h6>
-                            <div class="small text-muted">Haz click en la leyenda de cada gráfico para ocultar/mostrar categorías.</div>
+                            <div class="small text-muted">Click on each chart's legend to hide/show categories.</div>
                         </div>
                         <div class="row g-3">
                             <div class="col-md-6">
@@ -523,11 +523,53 @@
                 </div>
             </div>
 
+            <!-- Compensation section -->
+            <hr class="my-4">
+            <h5 class="mb-3" style="color: var(--primary-color);">
+                <i class="fas fa-euro-sign"></i> Compensation
+                <small class="text-muted fw-normal">Individual attainment and estimated variable payout for the filter range</small>
+                <a href="#" class="small ms-2" onclick="openCompSettings(); return false;" title="Edit plan"><i class="fas fa-cog"></i></a>
+            </h5>
+            <div id="compEmptyHint" class="alert alert-warning small mb-3" style="display:none;">
+                <i class="fas fa-info-circle"></i> Configure your <strong>Compensation Plan</strong> (menu <em>Tools → Compensation Plan</em>) to see these widgets.
+            </div>
+            <div class="row g-3 mb-3" id="compKPIs"></div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h6 class="fw-bold mb-2">Quota attainment (individual)</h6>
+                        <div id="compAttainmentBar"></div>
+                        <div class="small text-muted mt-2" id="compAttainmentSub">–</div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h6 class="fw-bold mb-2">Group share <small class="text-muted fw-normal">(my retirement / group quota)</small></h6>
+                        <div id="compGroupShareBar"></div>
+                        <div class="small text-muted mt-2" id="compGroupShareSub">–</div>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h6 class="fw-bold mb-2">Bookings by month <small class="text-muted fw-normal">(Upsell+NetNew vs Renew)</small></h6>
+                        <div id="compChartMonth" style="min-height:280px;"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h6 class="fw-bold mb-2">Cumulative attainment <small class="text-muted fw-normal">(variable_credit / individual_target)</small></h6>
+                        <div id="compChartCumulative" style="min-height:280px;"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Support Activities section -->
             <hr class="my-4">
             <h5 class="mb-3" style="color: var(--primary-color);">
                 <i class="fas fa-hands-helping"></i> Support Activities
-                <small class="text-muted fw-normal">Post Sales & Events (no cuentan como Won/Lost)</small>
+                <small class="text-muted fw-normal">Post Sales & Events (not counted as Won/Lost)</small>
             </h5>
             <div class="row g-3 mb-3" id="supportKPIs"></div>
             <div class="row g-3">
@@ -714,7 +756,7 @@
                             <label class="form-label fw-bold"><i class="fas fa-map-marker-alt me-1 text-muted"></i>District</label>
                             <input type="text" class="form-control" id="district" list="districtsList" placeholder="e.g. Spain Majors" autocomplete="off">
                             <datalist id="districtsList"></datalist>
-                            <div class="form-text small">Account Owner District. Autocomplete de los ya existentes.</div>
+                            <div class="form-text small">Account Owner District. Autocomplete from existing ones.</div>
                         </div>
 
                         <div class="col-md-12">
@@ -740,7 +782,7 @@
                             <div class="col-md-3">
                                 <label class="form-label fw-bold">Actual Close Date <span class="text-danger">*</span></label>
                                 <input type="date" class="form-control" id="closedDate">
-                                <div class="form-text small">Fecha real de cierre. Se usa para agrupar por FY.</div>
+                                <div class="form-text small">Actual close date. Used to group by FY.</div>
                             </div>
                             <div class="col-md-3" id="commercialOutcomeWrap">
                                 <label class="form-label fw-bold">Commercial Outcome <span class="text-danger">*</span></label>
@@ -752,9 +794,14 @@
                                 </select>
                             </div>
                             <div class="col-md-3" id="finalAmountWrap" style="display:none;">
-                                <label class="form-label fw-bold">Final Amount ($) <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="finalAmount" min="0" step="1000" placeholder="Adjusted amount at close">
+                                <label class="form-label fw-bold">Final Amount <span class="currency-label">(€)</span> <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="finalAmount" min="0" step="1000" placeholder="Adjusted amount at close" oninput="updateSplitHint()">
                                 <div class="form-text small">Pre-filled with the original Opp Amount. Editable.</div>
+                            </div>
+                            <div class="col-md-3" id="renewAmountWrap" style="display:none;">
+                                <label class="form-label fw-bold">Renew Amount <span class="currency-label">(€)</span></label>
+                                <input type="number" class="form-control" id="renewAmount" min="0" step="1000" value="0" oninput="updateSplitHint()">
+                                <div class="form-text small" id="renewSplitHint">Upsell+NetNew: — · Renew: —</div>
                             </div>
                             <div class="col-md-3" id="lossReasonWrap" style="display:none;">
                                 <label class="form-label fw-bold">Loss Reason</label>
@@ -828,33 +875,112 @@
     </div>
 </div>
 
-<!-- Fiscal Year Settings Modal -->
-<div class="modal fade" id="fyModal" tabindex="-1">
-    <div class="modal-dialog">
+<!-- Compensation Plan Settings Modal -->
+<div class="modal fade" id="compModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-calendar-week"></i> Fiscal Year Settings</h5>
+                <h5 class="modal-title"><i class="fas fa-euro-sign"></i> Compensation Plan</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <label class="form-label">Fiscal Year starts on the 1st of...</label>
-                <select class="form-select" id="fyMonthSelect">
-                    <option value="1">January</option><option value="2">February</option>
-                    <option value="3">March</option><option value="4">April</option>
-                    <option value="5">May</option><option value="6">June</option>
-                    <option value="7">July</option><option value="8">August</option>
-                    <option value="9">September</option><option value="10">October</option>
-                    <option value="11">November</option><option value="12">December</option>
-                </select>
-                <div class="small text-muted mt-2">
-                    Palo Alto: <strong>August</strong> (por defecto). Cambia si tu compañía usa otro.
-                    <br>Ejemplo con Aug: FY27 = Aug 1, 2026 → Jul 31, 2027.
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Base Salary Pay</label>
+                        <div class="input-group">
+                            <span class="input-group-text comp-cur-prefix">€</span>
+                            <input type="number" class="form-control" id="compBase" min="0" step="1000" placeholder="e.g. 80000" oninput="updateCompDerived()">
+                        </div>
+                        <div class="form-text small">Fixed annual salary (BASE).</div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">OTI (%)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="compOtiPct" min="0" max="99" step="1" placeholder="20" oninput="updateCompDerived()">
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <div class="form-text small">Share of OTE.</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Variable Target</label>
+                        <input type="text" class="form-control bg-light" id="compVariableTarget" readonly>
+                        <div class="form-text small">BASE × OTI/(100−OTI).</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">OTE (auto)</label>
+                        <input type="text" class="form-control bg-light" id="compOte" readonly>
+                        <div class="form-text small">BASE + Variable Target.</div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">OTI Currency</label>
+                        <select class="form-select" id="compCurrency">
+                            <option value="EUR">€ EUR</option>
+                            <option value="USD">$ USD</option>
+                            <option value="GBP">£ GBP</option>
+                        </select>
+                        <div class="form-text small">Global display currency.</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Fiscal Year starts on</label>
+                        <select class="form-select" id="compFyMonth">
+                            <option value="1">January</option><option value="2">February</option>
+                            <option value="3">March</option><option value="4">April</option>
+                            <option value="5">May</option><option value="6">June</option>
+                            <option value="7">July</option><option value="8">August</option>
+                            <option value="9">September</option><option value="10">October</option>
+                            <option value="11">November</option><option value="12">December</option>
+                        </select>
+                        <div class="form-text small" id="compFyPreview">–</div>
+                    </div>
+                    <div class="col-md-4"></div>
+
+                    <div class="col-12"><hr class="my-1"></div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Group Annual Quota</label>
+                        <div class="input-group">
+                            <span class="input-group-text comp-cur-prefix">€</span>
+                            <input type="number" class="form-control" id="compQuotaGroup" min="0" step="10000" placeholder="e.g. 38071947">
+                        </div>
+                        <div class="form-text small">Group annual quota (not individual).</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Group Size</label>
+                        <input type="number" class="form-control" id="compGroupSize" min="1" step="1" placeholder="5">
+                        <div class="form-text small">Presales in the group.</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Individual Target</label>
+                        <input type="text" class="form-control bg-light" id="compIndividualTarget" readonly>
+                        <div class="form-text small">Auto: quota / N.</div>
+                    </div>
+
+                    <div class="col-12"><hr class="my-1"></div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">BCR Upsell + Net New</label>
+                        <input type="number" class="form-control" id="compBcrNew" min="0" max="5" step="0.01" placeholder="1.00">
+                        <div class="form-text small">Retirement/variable coefficient for new business.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">BCR Renewal</label>
+                        <input type="number" class="form-control" id="compBcrRenew" min="0" max="5" step="0.01" placeholder="0.25">
+                        <div class="form-text small">Renewal does not count toward quota but pays variable at this coefficient.</div>
+                    </div>
                 </div>
-                <div class="alert alert-info small mt-3 mb-0" id="fyPreview"></div>
+
+                <div class="alert alert-info small mt-3 mb-0">
+                    <strong>How it is calculated:</strong><br>
+                    · <strong>OTI% is a share of total OTE</strong>, not of BASE. With OTI=20% ⇒ BASE = 80% of OTE, OTI = 20% of OTE (BASE/4).<br>
+                    · variable_target = BASE × OTI / (100 − OTI). OTE = BASE + variable_target.<br>
+                    · quota_retirement = Upsell+NetNew × BCR_new. variable_credit = Upsell+NetNew × BCR_new + Renew × BCR_renew.<br>
+                    · attainment% = variable_credit / individual_target. <strong>payout = variable_target × attainment%</strong>.
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="saveFYSettings()">Save</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveCompSettings()">Save</button>
             </div>
         </div>
     </div>
@@ -961,8 +1087,11 @@
         const isOpp    = type === 'Opportunity';
         const comm     = document.getElementById('commercialOutcome').value;
         const finalWrap = document.getElementById('finalAmountWrap');
+        const renewWrap = document.getElementById('renewAmountWrap');
         const lossWrap  = document.getElementById('lossReasonWrap');
-        finalWrap.style.display = isClosed && isOpp && comm === 'Won' ? '' : 'none';
+        const showAmt = isClosed && isOpp && comm === 'Won';
+        finalWrap.style.display = showAmt ? '' : 'none';
+        renewWrap.style.display = showAmt ? '' : 'none';
         lossWrap.style.display  = isClosed && (comm === 'Lost' || comm === 'No Decision' ||
                                                 document.getElementById('technicalOutcome').value === 'Technical Loss') ? '' : 'none';
         // Prefill finalAmount from oppAmount on first show
@@ -971,6 +1100,18 @@
             const orig = parseFloat(document.getElementById('oppAmount').value) || 0;
             if (orig > 0) fa.value = orig;
         }
+        updateSplitHint();
+    }
+    function updateSplitHint() {
+        const hint = document.getElementById('renewSplitHint');
+        if (!hint) return;
+        const total = parseFloat(document.getElementById('finalAmount').value) || 0;
+        const renew = parseFloat(document.getElementById('renewAmount').value) || 0;
+        const newBiz = total - renew;
+        const over = renew > total;
+        hint.innerHTML = over
+            ? `<span class="text-danger fw-bold">⚠ Renew (${fmtMoney(renew)}) cannot exceed Final Amount (${fmtMoney(total)})</span>`
+            : `Upsell+NetNew: <strong>${fmtMoney(newBiz)}</strong> · Renew: <strong>${fmtMoney(renew)}</strong>`;
     }
     // Also reveal loss reason when technicalOutcome changes to Loss
     document.addEventListener('DOMContentLoaded', () => {
@@ -1025,9 +1166,13 @@
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label small mb-0">Final $</label>
+                                <label class="form-label small mb-0">Final ${currencySymbol()}</label>
                                 <input type="number" class="form-control form-control-sm bulk-amount" id="${rowId}-amt" value="${item.oppAmount || ''}" min="0" step="1000">
-                            </div>` : '<div class="col-md-4"></div>'}
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-0">Renew ${currencySymbol()}</label>
+                                <input type="number" class="form-control form-control-sm bulk-renew" id="${rowId}-renew" value="0" min="0" step="1000">
+                            </div>` : '<div class="col-md-6"></div>'}
                             <div class="col-md-3">
                                 <label class="form-label small mb-0">Loss reason (optional)</label>
                                 <select class="form-select form-select-sm bulk-loss" id="${rowId}-loss">
@@ -1054,15 +1199,21 @@
                 const id = row.dataset.id;
                 const item = trrList.find(t => t.id === id);
                 if (!item) return;
-                const cd   = row.querySelector('.bulk-close-date')?.value || '';
-                const tech = row.querySelector('.bulk-tech')?.value || '';
-                const comm = row.querySelector('.bulk-comm')?.value || '';
-                const amt  = row.querySelector('.bulk-amount')?.value || '';
-                const loss = row.querySelector('.bulk-loss')?.value || '';
+                const cd    = row.querySelector('.bulk-close-date')?.value || '';
+                const tech  = row.querySelector('.bulk-tech')?.value || '';
+                const comm  = row.querySelector('.bulk-comm')?.value || '';
+                const amt   = row.querySelector('.bulk-amount')?.value || '';
+                const renew = row.querySelector('.bulk-renew')?.value || '';
+                const loss  = row.querySelector('.bulk-loss')?.value || '';
                 if (cd)   item.closedDate = cd;
                 if (tech) item.technicalOutcome = tech;
                 if (comm) item.commercialOutcome = comm;
-                if (comm === 'Won' && amt) item.finalAmount = amt;
+                if (comm === 'Won' && amt) {
+                    item.finalAmount = amt;
+                    const rn = parseFloat(renew) || 0;
+                    const fa = parseFloat(amt) || 0;
+                    item.renewAmount = String(Math.max(0, Math.min(rn, fa)));
+                }
                 if (loss) item.lossReason = loss;
             });
             saveToStorage();
@@ -1143,12 +1294,18 @@
     }
 
     function deleteAllData() {
-        if(confirm("⚠ WARNING: DELETE ALL DATA?")) {
-            trrList = [];
-            localStorage.setItem('pov_radar_data', JSON.stringify(trrList));
-            refreshActiveView();
-            renderSidebarStats();
-        }
+        if(!confirm("⚠ WARNING: DELETE ALL DATA?\n\nThis will remove:\n· All TRRs\n· Fiscal Year setting\n· Compensation Plan (BASE, OTI, quota, BCRs…)\n· Forecast snapshots\n\nUser identity is preserved.")) return;
+        trrList = [];
+        localStorage.setItem('pov_radar_data', JSON.stringify(trrList));
+        // Reset app-specific settings & snapshots
+        localStorage.removeItem('pov_radar_fy_start_month');
+        localStorage.removeItem('pov_radar_comp_plan');
+        localStorage.removeItem('pov_radar_forecast_snapshots');
+        // Repaint everything — sidebar widgets, currency labels, dashboard, form labels
+        document.querySelectorAll('.currency-label').forEach(el => el.textContent = '(' + currencySymbol() + ')');
+        refreshActiveView();
+        renderSidebarStats();
+        if (document.getElementById('metricsView').classList.contains('active')) renderMetrics();
     }
 
     function saveToStorage() {
@@ -1211,6 +1368,7 @@
         document.getElementById('technicalOutcome').value = '';
         document.getElementById('commercialOutcome').value = '';
         document.getElementById('finalAmount').value = '';
+        document.getElementById('renewAmount').value = 0;
         document.getElementById('lossReason').value = '';
         document.getElementById('lossReasonOther').value = '';
         document.getElementById('lossReasonOther').style.display = 'none';
@@ -1221,7 +1379,10 @@
 
         if(defaultOwner) document.getElementById('ownerName').value = defaultOwner;
     }
+    // Refresca etiquetas (€/$/£) según currency configurada
+    document.querySelectorAll('.currency-label').forEach(el => el.textContent = '(' + currencySymbol() + ')');
     onStatusChanged();
+    updateSplitHint();
     document.getElementById('formView').classList.add('active');
     }
 
@@ -1307,9 +1468,10 @@
     function formatCurrency(value) {
         if (!value || isNaN(value) || parseFloat(value) === 0) return '-';
         let val = parseFloat(value);
-        if (val >= 1000000) return '$' + (val / 1000000).toFixed(1) + 'M';
-        if (val >= 1000) return '$' + (val / 1000).toFixed(0) + 'k';
-        return '$' + val.toFixed(0);
+        const sym = (typeof currencySymbol === 'function') ? currencySymbol() : '€';
+        if (val >= 1000000) return sym + (val / 1000000).toFixed(1) + 'M';
+        if (val >= 1000) return sym + (val / 1000).toFixed(0) + 'k';
+        return sym + val.toFixed(0);
     }
 
 function renderSidebarStats() {
@@ -1413,10 +1575,33 @@ function renderSidebarStats() {
 }
 
 
+    // Fields that belong to a TRR. Anything outside this list is stripped on import
+    // to prevent leaking settings (compensation plan, FY, snapshots, currency) across users.
+    const TRR_ALLOWED_FIELDS = new Set([
+        'id','trrName','creationDate','accountName','ownerName','district',
+        'cortexProduct','engagementType','oppAmount','projectStatus',
+        'sfdcTrrLink','sfdcOppLink','sfdcTechValLink',
+        'startDate','endDate','complexity','workload',
+        'progress','nextSteps','challenges','comments',
+        'technicalOutcome','commercialOutcome','finalAmount','renewAmount',
+        'lossReason','closedDate',
+    ]);
+    function sanitizeTrr(obj) {
+        if (!obj || typeof obj !== 'object') return null;
+        const clean = {};
+        for (const k of Object.keys(obj)) {
+            if (TRR_ALLOWED_FIELDS.has(k)) clean[k] = obj[k];
+        }
+        return (clean.id || clean.trrName || clean.accountName) ? clean : null;
+    }
+
     function exportData(e) {
         if(e) e.preventDefault();
         if (!trrList || trrList.length === 0) { alert("No data to export."); return; }
-        const dataStr = JSON.stringify(trrList, null, 2);
+        // Whitelist: only TRR fields. Compensation Plan, FY setting and snapshots
+        // are intentionally NOT part of the export (they are personal settings).
+        const safe = trrList.map(sanitizeTrr).filter(Boolean);
+        const dataStr = JSON.stringify(safe, null, 2);
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1430,18 +1615,24 @@ function renderSidebarStats() {
     function importData(input) {
         const files = input.files;
         if (files.length === 0) return;
-        if (!confirm("Merge Data?\nOK: Merge\nCancel: Replace All")) trrList = []; 
+        if (!confirm("Merge Data?\nOK: Merge\nCancel: Replace All")) trrList = [];
         let processedCount = 0;
         Array.from(files).forEach(file => {
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    const importedData = JSON.parse(e.target.result);
-                    if (Array.isArray(importedData)) {
-                        importedData.forEach(importedItem => {
-                            const existingIndex = trrList.findIndex(t => t.id === importedItem.id);
-                            if (existingIndex >= 0) trrList[existingIndex] = importedItem;
-                            else trrList.push(importedItem);
+                    // Accept plain arrays OR wrapped {items:[...]} — anything else is ignored.
+                    // Never touches settings/FY/compensation: only trrList is mutated.
+                    const parsed = JSON.parse(e.target.result);
+                    const importedData = Array.isArray(parsed) ? parsed
+                                        : (parsed && Array.isArray(parsed.items) ? parsed.items : null);
+                    if (importedData) {
+                        importedData.forEach(raw => {
+                            const item = sanitizeTrr(raw);
+                            if (!item) return;
+                            const existingIndex = trrList.findIndex(t => t.id === item.id);
+                            if (existingIndex >= 0) trrList[existingIndex] = item;
+                            else trrList.push(item);
                         });
                     }
                 } catch (err) { alert("Invalid JSON."); }
@@ -1681,6 +1872,7 @@ function renderSidebarStats() {
             technicalOutcome:   document.getElementById('technicalOutcome').value || '',
             commercialOutcome:  document.getElementById('commercialOutcome').value || '',
             finalAmount:        document.getElementById('finalAmount').value || '',
+            renewAmount:        document.getElementById('renewAmount').value || '',
             lossReason:         lossReasonFinal || '',
             closedDate:         document.getElementById('closedDate').value || '',
         };
@@ -1694,6 +1886,12 @@ function renderSidebarStats() {
             if (isOpp) {
                 if (!trrData.commercialOutcome) errors.push('Commercial Outcome is required to close an Opportunity.');
                 if (trrData.commercialOutcome === 'Won' && !(parseFloat(trrData.finalAmount) > 0)) errors.push('Final Amount is required and must be > 0 for a Won Opportunity.');
+                if (trrData.commercialOutcome === 'Won') {
+                    const fa = parseFloat(trrData.finalAmount) || 0;
+                    const ra = parseFloat(trrData.renewAmount) || 0;
+                    if (ra < 0) errors.push('Renew Amount cannot be negative.');
+                    if (ra > fa) errors.push('Renew Amount cannot exceed Final Amount.');
+                }
             }
             if (errors.length) {
                 alert('⚠ Cannot close TRR:\n\n' + errors.join('\n'));
@@ -1749,6 +1947,7 @@ function renderSidebarStats() {
         document.getElementById('technicalOutcome').value  = item.technicalOutcome  || '';
         document.getElementById('commercialOutcome').value = item.commercialOutcome || '';
         document.getElementById('finalAmount').value       = item.finalAmount       || '';
+        document.getElementById('renewAmount').value       = item.renewAmount       || 0;
         document.getElementById('closedDate').value        = item.closedDate        || '';
         // Loss reason may have been stored as "Other: ..." — split back
         const lrRaw = item.lossReason || '';
@@ -2343,34 +2542,101 @@ function getFYBounds(fyTwoDigit) {
 }
 function getCurrentFY() { return getFYForDate(new Date()); }
 
-function openFYSettings() {
-    const sel = document.getElementById('fyMonthSelect');
-    sel.value = String(getFYStartMonth());
-    updateFYPreview();
-    sel.onchange = updateFYPreview;
-    new bootstrap.Modal(document.getElementById('fyModal')).show();
+// ═══════════════════════════════════════════════════════════════════════════
+//  COMPENSATION PLAN SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════
+const COMP_STORAGE_KEY = 'pov_radar_comp_plan';
+const COMP_DEFAULTS = {
+    base: 0,
+    otiPct: 20,
+    currency: 'EUR',
+    quotaGroup: 0,
+    groupSize: 5,
+    bcrNew: 1.0,
+    bcrRenew: 0.25,
+};
+const CURRENCY_SYMBOLS = {EUR: '€', USD: '$', GBP: '£'};
+
+function getCompPlan() {
+    try {
+        const raw = JSON.parse(localStorage.getItem(COMP_STORAGE_KEY) || '{}');
+        return {...COMP_DEFAULTS, ...raw};
+    } catch(e) { return {...COMP_DEFAULTS}; }
 }
-function updateFYPreview() {
-    const m = parseInt(document.getElementById('fyMonthSelect').value, 10);
+function saveCompPlan(p) {
+    localStorage.setItem(COMP_STORAGE_KEY, JSON.stringify(p));
+}
+function currencySymbol() { return CURRENCY_SYMBOLS[getCompPlan().currency] || '€'; }
+function individualTarget() {
+    const p = getCompPlan();
+    const n = Math.max(1, parseInt(p.groupSize) || 1);
+    return (parseFloat(p.quotaGroup) || 0) / n;
+}
+
+function openCompSettings() {
+    const p = getCompPlan();
+    document.getElementById('compBase').value        = p.base || '';
+    document.getElementById('compOtiPct').value      = p.otiPct;
+    document.getElementById('compCurrency').value    = p.currency;
+    document.getElementById('compQuotaGroup').value  = p.quotaGroup || '';
+    document.getElementById('compGroupSize').value   = p.groupSize;
+    document.getElementById('compBcrNew').value      = p.bcrNew;
+    document.getElementById('compBcrRenew').value    = p.bcrRenew;
+    document.getElementById('compFyMonth').value     = String(getFYStartMonth());
+    updateCompDerived();
+    ['compQuotaGroup','compGroupSize','compCurrency','compFyMonth'].forEach(id => {
+        document.getElementById(id).oninput  = updateCompDerived;
+        document.getElementById(id).onchange = updateCompDerived;
+    });
+    new bootstrap.Modal(document.getElementById('compModal')).show();
+}
+function updateCompDerived() {
+    const cur  = document.getElementById('compCurrency').value || 'EUR';
+    const sym  = CURRENCY_SYMBOLS[cur] || '€';
+    const base = parseFloat(document.getElementById('compBase').value) || 0;
+    const oti  = Math.max(0, Math.min(parseFloat(document.getElementById('compOtiPct').value) || 0, 99));
+    const q    = parseFloat(document.getElementById('compQuotaGroup').value) || 0;
+    const n    = Math.max(1, parseInt(document.getElementById('compGroupSize').value) || 1);
+
+    const varTarget = oti >= 100 ? 0 : base * oti / (100 - oti);
+    const ote       = base + varTarget;
+    const fmt = v => sym + ' ' + Number(v).toLocaleString('es-ES', {maximumFractionDigits: 0});
+
+    // Actualiza prefijos de currency dentro del modal
+    document.querySelectorAll('.comp-cur-prefix').forEach(el => el.textContent = sym);
+    document.getElementById('compVariableTarget').value   = fmt(varTarget);
+    document.getElementById('compOte').value              = fmt(ote);
+    document.getElementById('compIndividualTarget').value = fmt(q / n);
+
+    // Preview del Fiscal Year — no persiste hasta guardar
+    const m = parseInt(document.getElementById('compFyMonth').value, 10);
     const oldM = getFYStartMonth();
-    // Preview usando el mes elegido temporalmente
     localStorage.setItem(FY_STORAGE_KEY, String(m));
-    const cur = getFYBounds(getCurrentFY());
-    const prev = getFYBounds(getCurrentFY() - 1);
+    const cur2 = getFYBounds(getCurrentFY());
     localStorage.setItem(FY_STORAGE_KEY, String(oldM));
-    const f = d => d.toISOString().substring(0,10);
-    document.getElementById('fyPreview').innerHTML =
-        `Con este mes: <strong>${cur.label}</strong> = ${f(cur.from)} → ${f(cur.to)}<br>` +
-        `<strong>${prev.label}</strong> = ${f(prev.from)} → ${f(prev.to)}`;
+    const fmtD = d => d.toISOString().substring(0,10);
+    const prev = document.getElementById('compFyPreview');
+    if (prev) prev.innerHTML = `<strong>${cur2.label}</strong>: ${fmtD(cur2.from)} → ${fmtD(cur2.to)}`;
 }
-function saveFYSettings() {
-    const m = document.getElementById('fyMonthSelect').value;
-    if (setFYStartMonth(m)) {
-        bootstrap.Modal.getInstance(document.getElementById('fyModal')).hide();
-        if (document.getElementById('metricsView').classList.contains('active')) renderMetrics();
-    } else {
-        alert('Mes inválido');
-    }
+function saveCompSettings() {
+    const plan = {
+        base:       parseFloat(document.getElementById('compBase').value) || 0,
+        otiPct:     parseFloat(document.getElementById('compOtiPct').value) || 0,
+        currency:   document.getElementById('compCurrency').value || 'EUR',
+        quotaGroup: parseFloat(document.getElementById('compQuotaGroup').value) || 0,
+        groupSize:  parseInt(document.getElementById('compGroupSize').value) || 1,
+        bcrNew:     parseFloat(document.getElementById('compBcrNew').value) || 0,
+        bcrRenew:   parseFloat(document.getElementById('compBcrRenew').value) || 0,
+    };
+    saveCompPlan(plan);
+    // Persiste el Fiscal Year Month junto con el plan
+    setFYStartMonth(document.getElementById('compFyMonth').value);
+    // Refresca símbolos en labels del formulario de cierre
+    document.querySelectorAll('.currency-label').forEach(el => el.textContent = '(' + (CURRENCY_SYMBOLS[plan.currency] || '€') + ')');
+    bootstrap.Modal.getInstance(document.getElementById('compModal')).hide();
+    if (document.getElementById('metricsView').classList.contains('active')) renderMetrics();
+    if (document.getElementById('dashboardView').classList.contains('active')) refreshActiveView();
+    renderSidebarStats();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2569,10 +2835,17 @@ function computePrevPeriodMetrics(filters) {
 }
 
 function fmtMoney(n) {
-    if (!n || n === 0) return '$0';
-    if (Math.abs(n) >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
-    if (Math.abs(n) >= 1e3) return '$' + (n/1e3).toFixed(1) + 'k';
-    return '$' + n.toFixed(0);
+    const sym = (typeof currencySymbol === 'function') ? currencySymbol() : '€';
+    if (!n || n === 0) return sym + '0';
+    if (Math.abs(n) >= 1e6) return sym + (n/1e6).toFixed(1) + 'M';
+    if (Math.abs(n) >= 1e3) return sym + (n/1e3).toFixed(1) + 'k';
+    return sym + n.toFixed(0);
+}
+function fmtMoneyFull(n) {
+    // Sin sufijos K/M — cifra completa formateada
+    const sym = (typeof currencySymbol === 'function') ? currencySymbol() : '€';
+    if (!n || isNaN(n)) return sym + ' 0';
+    return sym + ' ' + Number(n).toLocaleString('es-ES', {maximumFractionDigits: 0});
 }
 function fmtPct(x) { return (x * 100).toFixed(1) + '%'; }
 function deltaArrow(cur, prev, higherIsBetter = true) {
@@ -2870,13 +3143,14 @@ function renderMetrics() {
     const fmt = d => d.toISOString().substring(0,10);
     const label = filters.label ? `<strong>${filters.label}</strong> · ` : '';
     document.getElementById('mfSummary').innerHTML =
-        `${label}Rango: <strong>${fmt(filters.from)}</strong> → <strong>${fmt(filters.to)}</strong> · ` +
+        `${label}Range: <strong>${fmt(filters.from)}</strong> → <strong>${fmt(filters.to)}</strong> · ` +
         `<strong>${mix.total}</strong> TRRs in range (Opps: ${mix.opp} · Post: ${mix.post} · Events: ${mix.event}) · ` +
         `Opps closed: <strong>${m.closed}</strong> · Won: <strong>${m.won}</strong> · Lost: <strong>${m.lost}</strong>`;
     renderEngagementMix(mix);
     renderMetricsKPIs(m, prev);
     renderMetricsCharts(m);
     renderDistrictCharts();
+    renderCompensation();
     renderSupportKPIs(s);
     renderSupportCharts(s);
 }
@@ -2938,14 +3212,14 @@ function renderDistrictCharts() {
             if (noDistrict.won)    parts.push(`${noDistrict.won} Won`);
             if (noDistrict.lost)   parts.push(`${noDistrict.lost} Lost`);
             if (noDistrict.noDec)  parts.push(`${noDistrict.noDec} No Decision`);
-            footer.innerHTML = `<i class="fas fa-info-circle text-warning me-1"></i>${noDistTotal} TRR${noDistTotal===1?'':'s'} sin distrito asignado (no mostrados en el gráfico): ${parts.join(' · ')}. Edita cada TRR para asignar el District.`;
+            footer.innerHTML = `<i class="fas fa-info-circle text-warning me-1"></i>${noDistTotal} TRR${noDistTotal===1?'':'s'} without an assigned district (not shown in the chart): ${parts.join(' · ')}. Edit each TRR to assign the District.`;
         } else {
             footer.innerHTML = '';
         }
     }
 
     if (entries.length === 0) {
-        document.getElementById('chartDistrictCount').innerHTML  = '<div class="text-muted small p-3 text-center">No hay TRRs con distrito en el rango/filtros seleccionados.</div>';
+        document.getElementById('chartDistrictCount').innerHTML  = '<div class="text-muted small p-3 text-center">No TRRs with a district in the selected range/filters.</div>';
         document.getElementById('chartDistrictAmount').innerHTML = '';
         return;
     }
@@ -2987,18 +3261,196 @@ function renderDistrictCharts() {
     metricsCharts.distAmount.render();
 }
 
+// ═══ Compensation widgets ═════════════════════════════════════════════════
+function parseAmtSafe(v) {
+    return parseFloat((v || '').toString().replace(/[",$\s]/g, '')) || 0;
+}
+
+function computeCompensation(filters) {
+    // Considera SÓLO Opps Won cerradas dentro del rango, aplicando filtros globales de producto/owner
+    const base = metricsFilterTRRs(filters).filter(t =>
+        (t.engagementType || 'Opportunity') === 'Opportunity' &&
+        t.projectStatus === 'Closed' &&
+        t.commercialOutcome === 'Won' &&
+        inRange(trrEndDate(t), filters.from, filters.to)
+    );
+
+    const plan = getCompPlan();
+    const target = individualTarget();
+
+    let newAmount = 0, renewAmount = 0;
+    const byMonth = {}; // key YYYY-MM → {new, renew, credit}
+    const dailyCredit = []; // [{date, credit}] para curva acumulada
+
+    base.forEach(t => {
+        const total = parseAmtSafe(t.finalAmount);
+        const renew = Math.max(0, Math.min(parseAmtSafe(t.renewAmount), total));
+        const newB  = total - renew;
+        newAmount   += newB;
+        renewAmount += renew;
+
+        const d = new Date(trrEndDate(t));
+        if (isNaN(d)) return;
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        if (!byMonth[key]) byMonth[key] = {new: 0, renew: 0, credit: 0};
+        byMonth[key].new   += newB;
+        byMonth[key].renew += renew;
+        byMonth[key].credit += newB * plan.bcrNew + renew * plan.bcrRenew;
+
+        dailyCredit.push({date: d, credit: newB * plan.bcrNew + renew * plan.bcrRenew});
+    });
+
+    const totalBookings   = newAmount + renewAmount;
+    const quotaRetirement = newAmount * plan.bcrNew;
+    const variableCredit  = newAmount * plan.bcrNew + renewAmount * plan.bcrRenew;
+    const individualAttPct = target > 0 ? (quotaRetirement / target) * 100 : 0;
+    const variableAttPct   = target > 0 ? (variableCredit  / target) * 100 : 0;
+    const groupSharePct    = plan.quotaGroup > 0 ? (quotaRetirement / plan.quotaGroup) * 100 : 0;
+    const groupShareTarget = 100 / Math.max(1, plan.groupSize);
+    // OTI% is a share of total OTE (BASE = 100−OTI% of OTE, OTI = OTI% of OTE)
+    // → variable_target = BASE × OTI/(100−OTI). With OTI=20% ⇒ BASE/4.
+    const otiPct = Math.max(0, Math.min(plan.otiPct, 99.9));
+    const variableTargetEur = plan.base * otiPct / (100 - otiPct);
+    const variablePayoutEur = variableTargetEur * variableAttPct / 100;
+
+    return {
+        plan, target, newAmount, renewAmount, totalBookings,
+        quotaRetirement, variableCredit,
+        individualAttPct, variableAttPct, groupSharePct, groupShareTarget,
+        variableTargetEur, variablePayoutEur,
+        oteEur: plan.base + variablePayoutEur,
+        byMonth, dailyCredit, wonCount: base.length,
+    };
+}
+
+function renderCompensation() {
+    const filters = metricsCurrentFilters();
+    const c = computeCompensation(filters);
+    const plan = c.plan;
+    const box = document.getElementById('compKPIs');
+    const emptyHint = document.getElementById('compEmptyHint');
+
+    // Mostrar hint si falta configurar lo básico (BASE o quota)
+    const configured = plan.base > 0 || plan.quotaGroup > 0;
+    if (emptyHint) emptyHint.style.display = configured ? 'none' : '';
+
+    const kpi = (label, val, sub = '', color = 'primary', icon = '') => `
+        <div class="col-md-4 col-sm-6">
+            <div class="card p-3 h-100" style="border-left:4px solid var(--bs-${color});">
+                <div class="small text-muted text-uppercase fw-bold" style="font-size:.7rem;letter-spacing:.5px;">${icon ? '<i class="'+icon+' me-1"></i>' : ''}${label}</div>
+                <div class="mt-1" style="font-size:1.5rem;font-weight:800;">${val}</div>
+                ${sub ? `<div class="small text-muted">${sub}</div>` : ''}
+            </div>
+        </div>`;
+
+    box.innerHTML =
+        // Row 1 — bookings breakdown
+        kpi('Total Bookings',    fmtMoneyFull(c.totalBookings),    `${c.wonCount} Won deals`,                          'success', 'fas fa-hand-holding-usd') +
+        kpi('Upsell + Net New',  fmtMoneyFull(c.newAmount),        `× BCR ${plan.bcrNew.toFixed(2)}`,                  'primary', 'fas fa-plus-circle') +
+        kpi('Renewal',           fmtMoneyFull(c.renewAmount),      `× BCR ${plan.bcrRenew.toFixed(2)} (no quota)`,     'info',    'fas fa-sync-alt') +
+        // Row 2 — quota & payout
+        kpi('Quota Retirement',  fmtMoneyFull(c.quotaRetirement),  `Individual target: ${fmtMoneyFull(c.target)}`,     'success', 'fas fa-crosshairs') +
+        kpi('Attainment',        c.individualAttPct.toFixed(1) + '%', `Variable-adj: ${c.variableAttPct.toFixed(1)}%`, 'warning', 'fas fa-percent') +
+        kpi('Variable Payout',   fmtMoneyFull(c.variablePayoutEur),  '', 'primary', 'fas fa-wallet');
+
+    // Barras de progreso
+    const bar = (host, pctRaw, colorGood, colorOver, sub, extraTargetPct) => {
+        const el = document.getElementById(host);
+        if (!el) return;
+        const pct = Math.max(0, pctRaw);
+        const clipped = Math.min(pct, 100);
+        const over = pct > 100;
+        const overWidth = over ? Math.min(pct - 100, 100) : 0;
+        const markerHtml = (typeof extraTargetPct === 'number' && extraTargetPct > 0 && extraTargetPct < 100)
+            ? `<div style="position:absolute; left:${extraTargetPct}%; top:-4px; bottom:-4px; width:2px; background:#000; opacity:.45;" title="Target ${extraTargetPct.toFixed(1)}%"></div>` : '';
+        el.innerHTML = `
+            <div style="position:relative; height:22px; background:#e9ecef; border-radius:11px; overflow:hidden;">
+                <div style="height:100%; width:${clipped}%; background:${colorGood}; transition:width .4s;"></div>
+                ${over ? `<div style="position:absolute; top:0; left:100%; height:100%; width:${overWidth}%; background:${colorOver};"></div>` : ''}
+                ${markerHtml}
+            </div>
+            <div class="d-flex justify-content-between small mt-1">
+                <span class="fw-bold" style="color:${over ? colorOver : colorGood};">${pct.toFixed(1)}%</span>
+                <span class="text-muted">${sub}</span>
+            </div>`;
+    };
+    bar('compAttainmentBar', c.individualAttPct, '#198754', '#0d6efd',
+        `${fmtMoneyFull(c.quotaRetirement)} of ${fmtMoneyFull(c.target)}`);
+    document.getElementById('compAttainmentSub').innerHTML =
+        `Variable-adjusted (includes renew × ${plan.bcrRenew}): <strong>${c.variableAttPct.toFixed(1)}%</strong> → payout <strong>${fmtMoneyFull(c.variablePayoutEur)}</strong>`;
+
+    bar('compGroupShareBar', c.groupSharePct, '#0dcaf0', '#6f42c1',
+        `${fmtMoneyFull(c.quotaRetirement)} of ${fmtMoneyFull(plan.quotaGroup)}`,
+        c.groupShareTarget);
+    document.getElementById('compGroupShareSub').innerHTML =
+        `Individual contribution target: <strong>${c.groupShareTarget.toFixed(1)}%</strong> (100 / ${plan.groupSize} presales). Black marker on the bar.`;
+
+    // Chart mensual (Upsell+NetNew vs Renew stacked)
+    ['compMonth','compCumul'].forEach(k => {
+        if (metricsCharts[k]) { try { metricsCharts[k].destroy(); } catch(e){} delete metricsCharts[k]; }
+    });
+    const months = Object.keys(c.byMonth).sort();
+    metricsCharts.compMonth = new ApexCharts(document.getElementById('compChartMonth'), {
+        chart: {type: 'bar', height: 280, stacked: true, toolbar: {show: false}},
+        series: [
+            {name: 'Upsell+NetNew', data: months.map(k => c.byMonth[k].new)},
+            {name: 'Renew',         data: months.map(k => c.byMonth[k].renew)},
+        ],
+        xaxis: {categories: months},
+        yaxis: {labels: {formatter: v => fmtMoney(v)}},
+        colors: ['#0d6efd', '#0dcaf0'],
+        dataLabels: {enabled: false},
+        legend: {position: 'top'},
+        tooltip: {y: {formatter: v => fmtMoneyFull(v)}},
+    });
+    metricsCharts.compMonth.render();
+
+    // Curva de attainment acumulado a lo largo del FY / rango
+    const sorted = c.dailyCredit.slice().sort((a,b) => a.date - b.date);
+    let acc = 0;
+    const points = sorted.map(p => {
+        acc += p.credit;
+        return {x: p.date.getTime(), y: c.target > 0 ? (acc / c.target * 100) : 0};
+    });
+    const fmt = d => d.toISOString().substring(0,10);
+    const linearTargetSerie = [
+        {x: filters.from.getTime(), y: 0},
+        {x: filters.to.getTime(),   y: 100},
+    ];
+    metricsCharts.compCumul = new ApexCharts(document.getElementById('compChartCumulative'), {
+        chart: {type: 'line', height: 280, toolbar: {show: false}, animations: {enabled: false}},
+        series: [
+            {name: 'Attainment %', data: points.length ? points : [{x: filters.from.getTime(), y: 0}, {x: filters.to.getTime(), y: 0}]},
+            {name: 'Linear target', data: linearTargetSerie},
+        ],
+        stroke: {curve: 'stepline', width: [3, 2], dashArray: [0, 5]},
+        colors: ['#198754', '#adb5bd'],
+        xaxis: {type: 'datetime'},
+        yaxis: {labels: {formatter: v => v.toFixed(0) + '%'}, min: 0},
+        annotations: {yaxis: [{y: 100, borderColor: '#dc3545', label: {text: '100%', style: {color: '#fff', background: '#dc3545'}}}]},
+        markers: {size: [4, 0]},
+        legend: {position: 'top'},
+    });
+    metricsCharts.compCumul.render();
+}
+
 function exportMetricsCSV() {
     const filters = metricsCurrentFilters();
     const base = metricsFilterTRRs(filters);
     const rows = [
-        ['id','trrName','account','owner','type','products','status','startDate','closedDate','oppAmount','finalAmount','commercialOutcome','technicalOutcome','lossReason']
+        ['id','trrName','account','owner','type','products','status','startDate','closedDate','oppAmount','finalAmount','renewAmount','newBusinessAmount','commercialOutcome','technicalOutcome','lossReason']
     ];
-    base.forEach(t => rows.push([
-        t.id, t.trrName, t.accountName, t.ownerName, t.engagementType || 'Opportunity',
-        t.cortexProduct || '', t.projectStatus, t.startDate || '', trrEndDate(t),
-        t.oppAmount || '', t.finalAmount || '',
-        t.commercialOutcome || '', t.technicalOutcome || '', t.lossReason || '',
-    ]));
+    base.forEach(t => {
+        const fa = parseFloat((t.finalAmount || '').toString().replace(/[",$\s]/g,'')) || 0;
+        const ra = Math.max(0, Math.min(parseFloat((t.renewAmount || '').toString().replace(/[",$\s]/g,'')) || 0, fa));
+        const nb = t.commercialOutcome === 'Won' ? Math.max(0, fa - ra) : 0;
+        rows.push([
+            t.id, t.trrName, t.accountName, t.ownerName, t.engagementType || 'Opportunity',
+            t.cortexProduct || '', t.projectStatus, t.startDate || '', trrEndDate(t),
+            t.oppAmount || '', t.finalAmount || '', t.renewAmount || '0', nb || '',
+            t.commercialOutcome || '', t.technicalOutcome || '', t.lossReason || '',
+        ]);
+    });
     const csv = rows.map(r => r.map(v => {
         const s = String(v ?? '').replace(/"/g,'""');
         return /[",\n]/.test(s) ? `"${s}"` : s;
