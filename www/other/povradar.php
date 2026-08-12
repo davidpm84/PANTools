@@ -233,6 +233,33 @@
         </div>
     </div>
 
+    <div class="mb-4" id="districtWidgetWrap" style="display:none;">
+        <h6 class="text-uppercase text-muted small fw-bold mb-2 ps-1">TRRs by District</h6>
+        <div class="stat-card p-2" style="border-left-color: #6f42c1;">
+            <div id="districtList" style="font-size: 0.85rem;"></div>
+        </div>
+    </div>
+
+    <div class="mb-4" id="fyWidgetWrap" style="display:none;">
+        <h6 class="text-uppercase text-muted small fw-bold mb-2 ps-1">This FY <span class="text-muted fw-normal" id="fyLabel"></span></h6>
+        <div class="stat-card p-2" style="border-left-color: #198754;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="stat-label mb-0">Won</div>
+                    <div class="stat-value" style="font-size:1.1rem;"><span id="fyWonCount">0</span> <small class="text-muted" style="font-size:.7rem;">/ <span id="fyClosedCount">0</span></small></div>
+                </div>
+                <div class="text-end">
+                    <div class="stat-label mb-0">Win Rate</div>
+                    <div class="stat-value" style="font-size:1.1rem;" id="fyWinRate">—</div>
+                </div>
+            </div>
+            <div class="mt-2" style="height:4px; background:#eee; border-radius:2px;">
+                <div id="fyWinBar" style="height:100%; width:0%; background:#198754; border-radius:2px; transition: width .3s;"></div>
+            </div>
+            <div class="small text-success mt-1" id="fyWonAmount" style="font-weight:600;">$0</div>
+        </div>
+    </div>
+
     <div class="mb-4">
         <h6 class="text-uppercase text-muted small fw-bold mb-2 ps-1">Quick Views</h6>
         <a href="#" class="nav-link-sidebar" id="linkAll" onclick="applyQuickFilter('all')">
@@ -247,6 +274,10 @@
         <a href="#" class="nav-link-sidebar text-danger" id="linkRisk" onclick="applyQuickFilter('at_risk')">
             <i class="fas fa-exclamation-circle"></i> At Risk / Critical
         </a>
+        <a href="#" class="nav-link-sidebar text-warning" id="linkPending" onclick="applyQuickFilter('pending_outcome')">
+            <i class="fas fa-clipboard-question"></i> Outcome Pending
+            <span class="badge bg-warning text-dark ms-auto" id="pendingBadge" style="display:none; font-size:.65rem;">0</span>
+        </a>
     </div>
 
     <a href="../index.php" class="btn btn-back">⬅️ Back to PANTools</a>
@@ -257,7 +288,10 @@
     <div class="top-navbar">
         <ul class="nav nav-pills" id="viewTabs">
             <li class="nav-item">
-                <a class="nav-link active" href="#" onclick="showDashboard()" id="tabList"><i class="fas fa-list me-1"></i> List View</a>
+                <a class="nav-link active" href="#" onclick="showMetrics()" id="tabMetrics"><i class="fas fa-chart-line me-1"></i> Dashboard</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" onclick="showDashboard()" id="tabList"><i class="fas fa-list me-1"></i> List View</a>
             </li>
             <li class="nav-item">
                 <a class="nav-link" href="#" onclick="showTimeline()" id="tabTimeline"><i class="fas fa-chart-gantt me-1"></i> Timeline</a>
@@ -293,6 +327,11 @@
                     <li>
                         <a class="dropdown-item" href="#" onclick="resetUser()">
                             <i class="fas fa-user-cog me-2"></i> Change Default Owner
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" href="#" onclick="openFYSettings()">
+                            <i class="fas fa-calendar-week me-2"></i> Fiscal Year Settings
                         </a>
                     </li>
                     <li>
@@ -358,8 +397,162 @@
     </div>
 
     <div class="content-area">
-        
-        <div id="dashboardView" class="view-section active">
+
+        <!-- ═══ METRICS DASHBOARD ═══ -->
+        <div id="metricsView" class="view-section active">
+            <!-- Filters -->
+            <div class="card p-3 mb-3">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1 fw-bold">Date Range</label>
+                        <select class="form-select form-select-sm" id="mfDateRange" onchange="onMetricsFiltersChanged()">
+                            <option value="fy_current" selected>Current FY</option>
+                            <option value="fy_last">Last FY</option>
+                            <option value="ytd">Year to Date (calendar)</option>
+                            <option value="q_current">Current Quarter</option>
+                            <option value="q_last">Last Quarter</option>
+                            <option value="last_90">Last 90 days</option>
+                            <option value="last_365">Last 365 days</option>
+                            <option value="all">All time</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2" id="mfCustomFromWrap" style="display:none;">
+                        <label class="form-label small mb-1">From</label>
+                        <input type="date" class="form-control form-control-sm" id="mfFrom" onchange="onMetricsFiltersChanged()">
+                    </div>
+                    <div class="col-md-2" id="mfCustomToWrap" style="display:none;">
+                        <label class="form-label small mb-1">To</label>
+                        <input type="date" class="form-control form-control-sm" id="mfTo" onchange="onMetricsFiltersChanged()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1 fw-bold">Product</label>
+                        <select class="form-select form-select-sm" id="mfProduct" onchange="onMetricsFiltersChanged()">
+                            <option value="">All products</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1 fw-bold">Owner</label>
+                        <select class="form-select form-select-sm" id="mfOwner" onchange="onMetricsFiltersChanged()">
+                            <option value="">All owners</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-2 d-flex justify-content-between align-items-center">
+                    <small class="text-muted" id="mfSummary">–</small>
+                    <div>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="exportMetricsCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Engagement mix (counts by type in range) -->
+            <div class="row g-2 mb-3" id="engagementMix"></div>
+
+            <!-- KPI tiles -->
+            <div class="row g-3 mb-3" id="metricsKPIs"></div>
+
+            <!-- Charts row 1 -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-4">
+                    <div class="card p-3 h-100">
+                        <h6 class="fw-bold mb-2">Commercial Outcomes</h6>
+                        <div id="chartCommercial" style="min-height:220px;"></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3 h-100">
+                        <h6 class="fw-bold mb-2">Technical Outcomes</h6>
+                        <div id="chartTechnical" style="min-height:220px;"></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3 h-100">
+                        <h6 class="fw-bold mb-2">Tech × Commercial Matrix</h6>
+                        <div id="chartMatrix" style="min-height:220px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts row 2 -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <div class="card p-3 h-100">
+                        <h6 class="fw-bold mb-2">Won amount by month</h6>
+                        <div id="chartByMonth" style="min-height:260px;"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-3 h-100">
+                        <h6 class="fw-bold mb-2">Win rate by product</h6>
+                        <div id="chartByProduct" style="min-height:260px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts row 3 -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-12">
+                    <div class="card p-3">
+                        <h6 class="fw-bold mb-2">Loss Reasons Distribution</h6>
+                        <div id="chartLossReasons" style="min-height:220px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts row 4 — District breakdown (stacked) -->
+            <div class="row g-3 mb-3">
+                <div class="col-md-12">
+                    <div class="card p-3">
+                        <div class="mb-3">
+                            <h6 class="fw-bold mb-0"><i class="fas fa-map-marker-alt me-1"></i> District Breakdown</h6>
+                            <div class="small text-muted">Haz click en la leyenda de cada gráfico para ocultar/mostrar categorías.</div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="small text-muted mb-1">TRR count by district</div>
+                                <div id="chartDistrictCount" style="min-height:260px;"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="small text-muted mb-1">Amount by district ($)</div>
+                                <div id="chartDistrictAmount" style="min-height:260px;"></div>
+                            </div>
+                        </div>
+                        <div class="small text-muted mt-2" id="districtFooterHint"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Support Activities section -->
+            <hr class="my-4">
+            <h5 class="mb-3" style="color: var(--primary-color);">
+                <i class="fas fa-hands-helping"></i> Support Activities
+                <small class="text-muted fw-normal">Post Sales & Events (no cuentan como Won/Lost)</small>
+            </h5>
+            <div class="row g-3 mb-3" id="supportKPIs"></div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <h6 class="fw-bold mb-2">Top 10 accounts <small class="text-muted fw-normal">(by count)</small></h6>
+                        <div id="chartAccounts" style="min-height:280px;"></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <h6 class="fw-bold mb-2">Top 10 accounts <small class="text-muted fw-normal">(by amount)</small></h6>
+                        <div id="chartAccountsAmount" style="min-height:280px;"></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <h6 class="fw-bold mb-2">Support activity split</h6>
+                        <div id="chartSupportSplit" style="min-height:280px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="dashboardView" class="view-section">
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="card">
@@ -500,7 +693,7 @@
 
                         <div class="col-md-4">
                             <label class="form-label">Status</label>
-                            <select class="form-select" id="projectStatus">
+                            <select class="form-select" id="projectStatus" onchange="onStatusChanged()">
                                 <option value="On Track">🟢 On Track</option>
                                 <option value="At Risk">🟡 At Risk</option>
                                 <option value="Planned">🔵 Planned</option>
@@ -508,8 +701,22 @@
                                 <option value="Parked">🟤 Parked</option>
                                 <option value="Closed">⚫ Closed</option>
                             </select>
+                            <label class="form-label fw-bold mt-2">Technical Outcome</label>
+                            <select class="form-select" id="technicalOutcome">
+                                <option value="">— Pending —</option>
+                                <option value="Technical Win">🔧 Technical Win</option>
+                                <option value="Partial">🔧 Partial</option>
+                                <option value="Technical Loss">🔧 Technical Loss</option>
+                            </select>
                         </div>
-                        
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold"><i class="fas fa-map-marker-alt me-1 text-muted"></i>District</label>
+                            <input type="text" class="form-control" id="district" list="districtsList" placeholder="e.g. Spain Majors" autocomplete="off">
+                            <datalist id="districtsList"></datalist>
+                            <div class="form-text small">Account Owner District. Autocomplete de los ya existentes.</div>
+                        </div>
+
                         <div class="col-md-12">
                             <label class="form-label fw-bold text-primary">SFDC Links</label>
                             <div class="row g-2">
@@ -525,6 +732,40 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- ═══ Close Details (visible cuando Status=Closed) ═══ -->
+                    <div id="closeDetailsSection" style="display:none; margin-top:20px; padding:15px; background:#fff8e6; border-left:4px solid #f0ad4e; border-radius:6px;">
+                        <h6 class="fw-bold mb-3" style="color:#b7791f;"><i class="fas fa-flag-checkered"></i> Close Details <small class="text-muted fw-normal">(required to close)</small></h6>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Actual Close Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="closedDate">
+                                <div class="form-text small">Fecha real de cierre. Se usa para agrupar por FY.</div>
+                            </div>
+                            <div class="col-md-3" id="commercialOutcomeWrap">
+                                <label class="form-label fw-bold">Commercial Outcome <span class="text-danger">*</span></label>
+                                <select class="form-select" id="commercialOutcome" onchange="onCommercialChanged()">
+                                    <option value="">— select —</option>
+                                    <option value="Won">🏆 Won</option>
+                                    <option value="Lost">❌ Lost</option>
+                                    <option value="No Decision">— No Decision</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3" id="finalAmountWrap" style="display:none;">
+                                <label class="form-label fw-bold">Final Amount ($) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="finalAmount" min="0" step="1000" placeholder="Adjusted amount at close">
+                                <div class="form-text small">Pre-filled with the original Opp Amount. Editable.</div>
+                            </div>
+                            <div class="col-md-3" id="lossReasonWrap" style="display:none;">
+                                <label class="form-label fw-bold">Loss Reason</label>
+                                <select class="form-select" id="lossReason">
+                                    <option value="">— select (optional) —</option>
+                                </select>
+                                <input type="text" class="form-control form-control-sm mt-1" id="lossReasonOther" placeholder="If Other, describe..." style="display:none;">
+                            </div>
+                        </div>
+                    </div>
+
                     <hr class="my-4">
                     <h5 class="mb-3" style="color: var(--primary-color);"><i class="fas fa-calendar-alt"></i> Planning & Complexity</h5>
                     <div class="row g-3">
@@ -587,16 +828,267 @@
     </div>
 </div>
 
+<!-- Fiscal Year Settings Modal -->
+<div class="modal fade" id="fyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-calendar-week"></i> Fiscal Year Settings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Fiscal Year starts on the 1st of...</label>
+                <select class="form-select" id="fyMonthSelect">
+                    <option value="1">January</option><option value="2">February</option>
+                    <option value="3">March</option><option value="4">April</option>
+                    <option value="5">May</option><option value="6">June</option>
+                    <option value="7">July</option><option value="8">August</option>
+                    <option value="9">September</option><option value="10">October</option>
+                    <option value="11">November</option><option value="12">December</option>
+                </select>
+                <div class="small text-muted mt-2">
+                    Palo Alto: <strong>August</strong> (por defecto). Cambia si tu compañía usa otro.
+                    <br>Ejemplo con Aug: FY27 = Aug 1, 2026 → Jul 31, 2027.
+                </div>
+                <div class="alert alert-info small mt-3 mb-0" id="fyPreview"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveFYSettings()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Outcome Assignment Modal (para SFDC auto-close) -->
+<div class="modal fade" id="bulkOutcomeModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-flag-checkered"></i> Fill Outcomes for Auto-Closed TRRs</h5>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">
+                    Los siguientes TRRs se cerraron automáticamente al no aparecer en el SFDC export.
+                    Rellena Technical Outcome, Commercial Outcome (para Opps), Final Amount y Loss Reason (opcional).
+                    Puedes saltarte alguno y quedará marcado con badge <span class="badge bg-warning text-dark">⚠ Outcome pending</span> para completarlo después.
+                </p>
+                <div id="bulkOutcomeList"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" onclick="closeBulkOutcomeModal(false)">Skip all (leave pending)</button>
+                <button type="button" class="btn btn-primary" onclick="closeBulkOutcomeModal(true)"><i class="fas fa-save"></i> Save filled outcomes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     let trrList = [];
     let chartInstance = null;
     let defaultOwner = '';
-    let currentSort = 'date'; 
+    let currentSort = 'date';
+    let quickFilterMode = null; // null | 'pending_outcome'
+
+    // Un TRR tiene outcome pendiente si está Closed pero le falta Technical Outcome
+    // (o Commercial Outcome cuando es Opportunity)
+    function isOutcomePending(item) {
+        if ((item.projectStatus || '') !== 'Closed') return false;
+        if (!item.technicalOutcome) return true;
+        const isOpp = (item.engagementType || 'Opportunity') === 'Opportunity';
+        if (isOpp && !item.commercialOutcome) return true;
+        return false;
+    }
+
+    // ═══ Outcome constants ═══════════════════════════════════════════════
+    const TECH_OUTCOMES     = ['Technical Win', 'Partial', 'Technical Loss'];
+    const COMMERCIAL_OUTCOMES = ['Won', 'Lost', 'No Decision'];
+    const LOSS_REASONS = [
+        'Price / Budget',
+        'Competitor / Alternative solution',
+        'Timing / Postponed',
+        'Feature gap',
+        'Poor fit / Requirements changed',
+        'Champion left / Internal politics',
+        'Insufficient PoV time',
+        'Regulatory / Compliance',
+        'Other',
+    ];
+    function isOutcomePending(item) {
+        if (item.projectStatus !== 'Closed') return false;
+        if (!item.closedDate) return true;
+        if (!item.technicalOutcome) return true;
+        if ((item.engagementType || 'Opportunity') === 'Opportunity') {
+            if (!item.commercialOutcome) return true;
+            if (item.commercialOutcome === 'Won' && !(parseFloat(item.finalAmount) > 0)) return true;
+        }
+        return false;
+    }
+    // ═══ Close Details show/hide ══════════════════════════════════════════
+    function populateLossReasons() {
+        const sel = document.getElementById('lossReason');
+        if (!sel || sel.dataset.populated) return;
+        LOSS_REASONS.forEach(r => {
+            const o = document.createElement('option');
+            o.value = r; o.text = r;
+            sel.appendChild(o);
+        });
+        sel.dataset.populated = '1';
+        sel.addEventListener('change', () => {
+            document.getElementById('lossReasonOther').style.display = sel.value === 'Other' ? '' : 'none';
+        });
+    }
+    function onStatusChanged() {
+        const status = document.getElementById('projectStatus').value;
+        const type   = document.getElementById('engagementType').value;
+        const isClosed = status === 'Closed';
+        const isOpp    = type === 'Opportunity';
+        const box = document.getElementById('closeDetailsSection');
+        box.style.display = isClosed ? '' : 'none';
+        // Prefill closedDate con hoy si abrimos la sección y aún no hay fecha
+        if (isClosed) {
+            const cd = document.getElementById('closedDate');
+            if (cd && !cd.value) cd.value = getTodayLocalISO();
+        }
+        // Fields only meaningful for Opps
+        document.getElementById('commercialOutcomeWrap').style.display = isClosed && isOpp ? '' : 'none';
+        onCommercialChanged();
+    }
+    function onCommercialChanged() {
+        const status = document.getElementById('projectStatus').value;
+        const type   = document.getElementById('engagementType').value;
+        const isClosed = status === 'Closed';
+        const isOpp    = type === 'Opportunity';
+        const comm     = document.getElementById('commercialOutcome').value;
+        const finalWrap = document.getElementById('finalAmountWrap');
+        const lossWrap  = document.getElementById('lossReasonWrap');
+        finalWrap.style.display = isClosed && isOpp && comm === 'Won' ? '' : 'none';
+        lossWrap.style.display  = isClosed && (comm === 'Lost' || comm === 'No Decision' ||
+                                                document.getElementById('technicalOutcome').value === 'Technical Loss') ? '' : 'none';
+        // Prefill finalAmount from oppAmount on first show
+        const fa = document.getElementById('finalAmount');
+        if (comm === 'Won' && !fa.value) {
+            const orig = parseFloat(document.getElementById('oppAmount').value) || 0;
+            if (orig > 0) fa.value = orig;
+        }
+    }
+    // Also reveal loss reason when technicalOutcome changes to Loss
+    document.addEventListener('DOMContentLoaded', () => {
+        populateLossReasons();
+        const te = document.getElementById('technicalOutcome');
+        if (te) te.addEventListener('change', onCommercialChanged);
+        const et = document.getElementById('engagementType');
+        if (et) et.addEventListener('change', onStatusChanged);
+    });
+
+    // ═══ Bulk Outcome Modal (SFDC auto-close) ════════════════════════════
+    let bulkOutcomeIds = [];
+    function openBulkOutcomeModal(ids) {
+        bulkOutcomeIds = ids.slice();
+        const box = document.getElementById('bulkOutcomeList');
+        box.innerHTML = '';
+        ids.forEach((id, idx) => {
+            const item = trrList.find(t => t.id === id);
+            if (!item) return;
+            const isOpp = (item.engagementType || 'Opportunity') === 'Opportunity';
+            const opts = LOSS_REASONS.map(r => `<option value="${r}">${r}</option>`).join('');
+            const rowId = 'bulk-' + idx;
+            box.insertAdjacentHTML('beforeend', `
+                <div class="card mb-2" data-idx="${idx}" data-id="${id}">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between mb-2">
+                            <div>
+                                <strong>${item.trrName || id}</strong>
+                                <span class="text-muted small ms-2">${item.accountName || ''} · ${item.ownerName || ''}</span>
+                                <span class="badge ${isOpp ? 'bg-info' : 'bg-secondary'} ms-2">${item.engagementType || 'Opportunity'}</span>
+                            </div>
+                            <span class="badge bg-light text-dark border">${item.id}</span>
+                        </div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-2">
+                                <label class="form-label small mb-0">Close date</label>
+                                <input type="date" class="form-control form-control-sm bulk-close-date" id="${rowId}-cd" value="${item.closedDate || getTodayLocalISO()}">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-0">Technical</label>
+                                <select class="form-select form-select-sm bulk-tech" id="${rowId}-tech">
+                                    <option value="">— pending —</option>
+                                    <option>Technical Win</option><option>Partial</option><option>Technical Loss</option>
+                                </select>
+                            </div>
+                            ${isOpp ? `
+                            <div class="col-md-2">
+                                <label class="form-label small mb-0">Commercial</label>
+                                <select class="form-select form-select-sm bulk-comm" id="${rowId}-comm">
+                                    <option value="">— pending —</option>
+                                    <option>Won</option><option>Lost</option><option>No Decision</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-0">Final $</label>
+                                <input type="number" class="form-control form-control-sm bulk-amount" id="${rowId}-amt" value="${item.oppAmount || ''}" min="0" step="1000">
+                            </div>` : '<div class="col-md-4"></div>'}
+                            <div class="col-md-3">
+                                <label class="form-label small mb-0">Loss reason (optional)</label>
+                                <select class="form-select form-select-sm bulk-loss" id="${rowId}-loss">
+                                    <option value="">—</option>${opts}
+                                </select>
+                            </div>
+                            <div class="col-md-1 text-end">
+                                <a href="#" class="small text-danger" onclick="removeBulkRow(${idx}); return false;" title="Skip this one">Skip</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `);
+        });
+        new bootstrap.Modal(document.getElementById('bulkOutcomeModal')).show();
+    }
+    function removeBulkRow(idx) {
+        const row = document.querySelector(`#bulkOutcomeList [data-idx="${idx}"]`);
+        if (row) row.remove();
+    }
+    function closeBulkOutcomeModal(save) {
+        if (save) {
+            document.querySelectorAll('#bulkOutcomeList .card').forEach(row => {
+                const id = row.dataset.id;
+                const item = trrList.find(t => t.id === id);
+                if (!item) return;
+                const cd   = row.querySelector('.bulk-close-date')?.value || '';
+                const tech = row.querySelector('.bulk-tech')?.value || '';
+                const comm = row.querySelector('.bulk-comm')?.value || '';
+                const amt  = row.querySelector('.bulk-amount')?.value || '';
+                const loss = row.querySelector('.bulk-loss')?.value || '';
+                if (cd)   item.closedDate = cd;
+                if (tech) item.technicalOutcome = tech;
+                if (comm) item.commercialOutcome = comm;
+                if (comm === 'Won' && amt) item.finalAmount = amt;
+                if (loss) item.lossReason = loss;
+            });
+            saveToStorage();
+        }
+        bootstrap.Modal.getInstance(document.getElementById('bulkOutcomeModal')).hide();
+        bulkOutcomeIds = [];
+        showDashboard();
+    }
+
+    function outcomeBadge(item) {
+        if (item.projectStatus !== 'Closed') return '';
+        const parts = [];
+        if (isOutcomePending(item)) parts.push('<span class="badge bg-warning text-dark" title="Outcome pending">⚠ Outcome pending</span>');
+        if (item.commercialOutcome === 'Won')  parts.push('<span class="badge bg-success">🏆 Won</span>');
+        if (item.commercialOutcome === 'Lost') parts.push('<span class="badge bg-danger">❌ Lost</span>');
+        if (item.commercialOutcome === 'No Decision') parts.push('<span class="badge bg-secondary">— No Decision</span>');
+        if (item.technicalOutcome === 'Technical Win')  parts.push('<span class="badge" style="background:#0d6efd">🔧 Tech Win</span>');
+        if (item.technicalOutcome === 'Technical Loss') parts.push('<span class="badge" style="background:#6f1d1b">🔧 Tech Loss</span>');
+        if (item.technicalOutcome === 'Partial')        parts.push('<span class="badge" style="background:#795548">🔧 Tech Partial</span>');
+        return parts.join(' ');
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
         loadFromStorage();
-        checkDefaultOwner(); 
-        showDashboard(); 
+        checkDefaultOwner();
+        showMetrics();
         const dateInput = document.getElementById('creationDate');
         if(dateInput) dateInput.valueAsDate = new Date();
     });
@@ -604,9 +1096,15 @@
     function loadFromStorage() {
         const data = localStorage.getItem('pov_radar_data');
         if (data) trrList = JSON.parse(data);
-        const storedOwner = localStorage.getItem('pov_radar_default_owner');
-        if(storedOwner) defaultOwner = storedOwner;
-        
+        // PANTools shared identity (fallback a la key vieja para retrocompatibilidad)
+        const sharedOwner = (localStorage.getItem('pantools_user_name') || '').trim();
+        const legacyOwner = (localStorage.getItem('pov_radar_default_owner') || '').trim();
+        defaultOwner = sharedOwner || legacyOwner || '';
+        if (defaultOwner) {
+            // Sincroniza ambas keys por si acaso
+            localStorage.setItem('pantools_user_name', defaultOwner);
+            localStorage.setItem('pov_radar_default_owner', defaultOwner);
+        }
         renderSidebarStats();
         renderUserBadge();
     }
@@ -617,10 +1115,11 @@
                 const name = prompt("Welcome to PoV Radar!\nPlease enter your name (Presales/Owner):");
                 if (name && name.trim() !== "") {
                     defaultOwner = name.trim();
+                    localStorage.setItem('pantools_user_name', defaultOwner);
                     localStorage.setItem('pov_radar_default_owner', defaultOwner);
                     renderUserBadge();
                 }
-            }, 500); 
+            }, 500);
         }
     }
 
@@ -638,6 +1137,7 @@
     function resetUser() {
         if(confirm("Change user?")) {
             localStorage.removeItem('pov_radar_default_owner');
+            localStorage.removeItem('pantools_user_name');
             location.reload();
         }
     }
@@ -667,7 +1167,15 @@
         document.getElementById('dashboardView').classList.add('active');
         document.getElementById('tabList').classList.add('active');
         document.getElementById('globalFilters').style.display = 'block';
-        renderTable(); 
+        renderTable();
+    }
+
+    function showMetrics() {
+        hideAllViews();
+        document.getElementById('metricsView').classList.add('active');
+        document.getElementById('tabMetrics').classList.add('active');
+        document.getElementById('globalFilters').style.display = 'none';
+        renderMetrics();
     }
 
     function showTimeline() {
@@ -680,24 +1188,40 @@
 
     function showCreateForm(reset = true) {
     hideAllViews();
-    document.getElementById('globalFilters').style.display = 'none'; 
+    document.getElementById('globalFilters').style.display = 'none';
+
+    // Popular datalist de distritos con los que ya existen en trrList
+    const dl = document.getElementById('districtsList');
+    if (dl) {
+        const districts = [...new Set(trrList.map(t => (t.district || '').trim()).filter(Boolean))].sort();
+        dl.innerHTML = districts.map(d => `<option value="${d.replace(/"/g,'&quot;')}"></option>`).join('');
+    }
 
     if (reset) {
         document.getElementById('trrForm').reset();
-        document.getElementById('trrId').value = ''; 
+        document.getElementById('trrId').value = '';
         document.getElementById('formTitle').innerText = 'New Report';
         document.getElementById('creationDate').valueAsDate = new Date();
         document.getElementById('complexity').value = 'Medium';
         document.getElementById('workload').value = 'Normal';
-        document.getElementById('engagementType').value = 'Opportunity'; 
+        document.getElementById('engagementType').value = 'Opportunity';
         document.getElementById('oppAmount').value = '';
+        document.getElementById('district').value = '';
+        // Reset new outcome fields
+        document.getElementById('technicalOutcome').value = '';
+        document.getElementById('commercialOutcome').value = '';
+        document.getElementById('finalAmount').value = '';
+        document.getElementById('lossReason').value = '';
+        document.getElementById('lossReasonOther').value = '';
+        document.getElementById('lossReasonOther').style.display = 'none';
+        document.getElementById('closedDate').value = '';
 
         const select = document.getElementById('cortexProduct');
         Array.from(select.options).forEach(opt => opt.selected = false);
 
         if(defaultOwner) document.getElementById('ownerName').value = defaultOwner;
     }
-
+    onStatusChanged();
     document.getElementById('formView').classList.add('active');
     }
 
@@ -708,30 +1232,44 @@
         document.querySelectorAll('.status-filter').forEach(c => c.checked = true);
         document.querySelectorAll('.eng-filter').forEach(c => c.checked = true);
         document.getElementById('btnClosed').checked = false;
-        
+
         document.querySelectorAll('.nav-link-sidebar').forEach(l => l.classList.remove('active'));
         currentSort = 'date';
+        quickFilterMode = null;
 
         if (type === 'all') {
             document.getElementById('linkAll').classList.add('active');
-        } 
+        }
         else if (type === 'my_active') {
             document.getElementById('linkMy').classList.add('active');
             document.getElementById('globalSearch').value = defaultOwner;
-        } 
+        }
         else if (type === 'high_value') {
             document.getElementById('linkTop').classList.add('active');
             document.querySelectorAll('.eng-filter').forEach(c => c.checked = false);
             document.getElementById('btnOpp').checked = true;
             currentSort = 'amount'; // Enable Amount Sort
-        } 
+        }
         else if (type === 'at_risk') {
             document.getElementById('linkRisk').classList.add('active');
             document.querySelectorAll('.status-filter').forEach(c => c.checked = false);
             document.getElementById('btnAtRisk').checked = true;
         }
+        else if (type === 'pending_outcome') {
+            document.getElementById('linkPending').classList.add('active');
+            // Sólo Closed: dejar todas las categorías de status desmarcadas + marcar Closed
+            document.querySelectorAll('.status-filter').forEach(c => c.checked = false);
+            document.getElementById('btnClosed').checked = true;
+            quickFilterMode = 'pending_outcome';
+        }
 
-        refreshActiveView();
+        // Asegura que estamos en List View para que se apliquen los filtros
+        if (!document.getElementById('dashboardView').classList.contains('active') &&
+            !document.getElementById('timelineView').classList.contains('active')) {
+            showDashboard();
+        } else {
+            refreshActiveView();
+        }
     }
 
     function getFilteredData() {
@@ -744,13 +1282,15 @@
         const selectedTypes = Array.from(engCheckboxes).map(cb => cb.value);
 
         return trrList.filter(item => {
-            const matchesSearch = item.accountName.toLowerCase().includes(searchVal) || 
+            const matchesSearch = item.accountName.toLowerCase().includes(searchVal) ||
                                   (item.ownerName && item.ownerName.toLowerCase().includes(searchVal)) ||
                                   (item.trrName.toLowerCase().includes(searchVal));
-            
+
             const matchesStatus = selectedStatuses.includes(item.projectStatus);
             const type = item.engagementType || 'Opportunity';
             const matchesType = selectedTypes.includes(type);
+
+            if (quickFilterMode === 'pending_outcome' && !isOutcomePending(item)) return false;
 
             return matchesSearch && matchesStatus && matchesType;
         });
@@ -775,23 +1315,101 @@
 function renderSidebarStats() {
   let totalAmount = 0;
   let activeCount = 0;
+  let pendingCount = 0;
+  const districtCounts = {};
+
+  // "This FY" stats — Opps cerradas dentro del FY actual
+  const fyNow = getFYForDate(new Date());
+  const fyBounds = getFYBounds(fyNow);
+  let fyClosedOpps = 0, fyWonOpps = 0, fyWonAmount = 0;
+  const parseAmt = v => parseFloat((v || '0').toString().replace(/[",$\s]/g, '')) || 0;
 
   trrList.forEach(item => {
     const status = (item.projectStatus || '').trim();
-    const type = (item.engagementType || 'Opportunity').trim(); // default por compatibilidad
+    const type = (item.engagementType || 'Opportunity').trim();
 
-    // Active items = todo menos Closed (si quieres)
     if (status !== 'Closed') activeCount++;
+    if (isOutcomePending(item)) pendingCount++;
 
-    // Total Value = SOLO Closed + Opportunity
     if (status != 'Closed') {
-      const cleanAmt = parseFloat((item.oppAmount || '0').toString().replace(/[",$\s]/g, ''));
-      if (!isNaN(cleanAmt)) totalAmount += cleanAmt;
+      const cleanAmt = parseAmt(item.oppAmount);
+      totalAmount += cleanAmt;
+    }
+
+    if (status !== 'Closed') {
+      const d = (item.district || '').trim();
+      if (d) districtCounts[d] = (districtCounts[d] || 0) + 1;
+    }
+
+    // FY stats: sólo Opps cerradas dentro del FY actual
+    if (status === 'Closed' && type === 'Opportunity') {
+      const closeDateStr = item.closedDate || item.endDate || '';
+      const cd = closeDateStr ? new Date(closeDateStr) : null;
+      if (cd && !isNaN(cd) && cd >= fyBounds.from && cd <= fyBounds.to) {
+        fyClosedOpps++;
+        if (item.commercialOutcome === 'Won') {
+          fyWonOpps++;
+          fyWonAmount += parseAmt(item.finalAmount);
+        }
+      }
     }
   });
 
   document.getElementById('kpiTotalAmount').innerText = formatCurrency(totalAmount);
   document.getElementById('kpiTotalCount').innerText = activeCount;
+
+  // Badge de "Outcome Pending" en el sidebar
+  const pendingBadge = document.getElementById('pendingBadge');
+  if (pendingBadge) {
+    if (pendingCount > 0) {
+      pendingBadge.textContent = pendingCount;
+      pendingBadge.style.display = '';
+    } else {
+      pendingBadge.style.display = 'none';
+    }
+  }
+
+  // Widget "This FY" — se muestra si hay al menos alguna Opp cerrada este FY
+  const fyWrap = document.getElementById('fyWidgetWrap');
+  if (fyWrap) {
+    if (fyClosedOpps > 0) {
+      fyWrap.style.display = '';
+      document.getElementById('fyLabel').textContent = `FY${fyNow}`;
+      document.getElementById('fyWonCount').textContent = fyWonOpps;
+      document.getElementById('fyClosedCount').textContent = fyClosedOpps;
+      const rate = fyClosedOpps > 0 ? Math.round((fyWonOpps / fyClosedOpps) * 100) : 0;
+      document.getElementById('fyWinRate').textContent = rate + '%';
+      document.getElementById('fyWinBar').style.width = rate + '%';
+      document.getElementById('fyWonAmount').textContent = formatCurrency(fyWonAmount) + ' won';
+    } else {
+      fyWrap.style.display = 'none';
+    }
+  }
+
+  // Widget TRRs by District — solo se muestra si hay datos
+  const wrap = document.getElementById('districtWidgetWrap');
+  const list = document.getElementById('districtList');
+  if (wrap && list) {
+    const entries = Object.entries(districtCounts).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) {
+      wrap.style.display = 'none';
+    } else {
+      wrap.style.display = '';
+      const maxCount = entries[0][1];
+      list.innerHTML = entries.map(([name, count]) => {
+        const pct = Math.round((count / maxCount) * 100);
+        const safeName = String(name).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+        return `
+          <div class="d-flex justify-content-between align-items-center mb-1" style="gap:6px;">
+            <span class="text-truncate" title="${safeName}" style="max-width:170px;">${safeName}</span>
+            <span class="badge bg-secondary" style="min-width:26px;">${count}</span>
+          </div>
+          <div style="height:3px; background:#eee; border-radius:2px; margin-bottom:8px;">
+            <div style="height:100%; width:${pct}%; background:#6f42c1; border-radius:2px;"></div>
+          </div>`;
+      }).join('');
+    }
+  }
 }
 
 
@@ -855,45 +1473,166 @@ function renderSidebarStats() {
         return weeks;
     }
 
-    function renderForecast() {
+    // Cache de la data de TimeTracker (para no golpear el endpoint en cada render)
+    let ttData = null;
+    async function fetchTimeTrackerData() {
+        try {
+            const r = await fetch('timetracker/?action=summary', {cache: 'no-store'});
+            if (!r.ok) return null;
+            const j = await r.json();
+            return j.ok ? j : null;
+        } catch(e) { return null; }
+    }
+    function fmtHm(sec) {
+        const sign = sec < 0 ? '-' : '';
+        sec = Math.abs(sec|0);
+        const h = Math.floor(sec/3600);
+        const m = Math.floor((sec%3600)/60);
+        return `${sign}${h}h${m>0?' '+String(m).padStart(2,'0')+'m':''}`;
+    }
+    function ymdLocal(d) {
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    // Snapshots del forecast — clave: lunes YYYY-MM-DD → { owner: {points, count} }
+    const SNAP_KEY = 'pov_radar_forecast_snapshots';
+    const SNAP_KEEP_WEEKS = 12;
+    function loadSnapshots() {
+        try { return JSON.parse(localStorage.getItem(SNAP_KEY) || '{}') || {}; }
+        catch(e) { return {}; }
+    }
+    function saveSnapshot(mondayKey, ownersData) {
+        const snaps = loadSnapshots();
+        snaps[mondayKey] = ownersData;
+        // Podar: conservar solo los N lunes más recientes
+        const keys = Object.keys(snaps).sort().reverse().slice(0, SNAP_KEEP_WEEKS);
+        const pruned = {};
+        keys.forEach(k => pruned[k] = snaps[k]);
+        localStorage.setItem(SNAP_KEY, JSON.stringify(pruned));
+    }
+    function getSnapshotForWeek(mondayKey) {
+        return loadSnapshots()[mondayKey] || null;
+    }
+
+    async function renderForecast() {
         const tbody = document.getElementById('forecastBody');
         const headerRow = document.getElementById('forecastHeader');
         if(!tbody || !headerRow) return;
+        // Refresh TT data (silencioso si falla)
+        ttData = await fetchTimeTrackerData();
+        const ttUser = (ttData && ttData.user_name || '').toLowerCase().trim();
+
         const weeks = getNext4Weeks();
         headerRow.innerHTML = '<th class="text-start ps-3" style="width: 20%;">Owner</th>';
+        // Columna retrospectiva "Last Week" — siempre visible (snapshot histórico + horas TT)
+        {
+            const lm = new Date(weeks[0].start); lm.setDate(lm.getDate() - 7);
+            const dateStr = `${lm.getDate()}/${lm.getMonth()+1}`;
+            headerRow.innerHTML += `<th class="text-muted" style="background:#f8f9fa;" title="Snapshot del forecast que había el lunes de esa semana + horas reales">Last Week <br><small class="fw-normal">${dateStr}</small></th>`;
+        }
         const weekLabels = ["This Week", "Next Week", "Week +2", "Week +3"];
         weeks.forEach((w, idx) => {
             const dateStr = `${w.start.getDate()}/${w.start.getMonth()+1}`;
             headerRow.innerHTML += `<th>${weekLabels[idx]} <br><small class="fw-normal text-muted">${dateStr}</small></th>`;
         });
         const owners = [...new Set(trrList.map(i => i.ownerName || 'Unassigned'))].sort();
-        if(owners.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center py-3">No active data</td></tr>'; return; }
+        // La columna "Last Week" se muestra siempre (para poder ver snapshots aunque TT no responda)
+        const hasLastWeek = true;
+        const totalCols = 1 + weeks.length + (hasLastWeek ? 1 : 0);
+        if(owners.length === 0) { tbody.innerHTML = `<tr><td colspan="${totalCols}" class="text-center py-3">No active data</td></tr>`; return; }
+
+        // Score helpers (extraídos para no duplicar en snapshot y render)
+        const compScore = { 'Low': 1, 'Medium': 2, 'High': 4 };
+        const workScore = { 'Light': 0, 'Normal': 1, 'Heavy': 3 };
+        function pointsForOwnerWeek(owner, week) {
+            let points = 0, count = 0;
+            trrList.forEach(item => {
+                if ((item.ownerName || 'Unassigned') !== owner) return;
+                if (['Parked', 'Not Started', 'Closed'].includes(item.projectStatus)) return;
+                const pStart = new Date(item.startDate);
+                const pEnd = new Date(item.endDate);
+                if (pStart <= week.end && pEnd >= week.start) {
+                    const cVal = compScore[item.complexity] || 2;
+                    const wVal = (workScore[item.workload] !== undefined) ? workScore[item.workload] : 1;
+                    points += (cVal + wVal);
+                    count++;
+                }
+            });
+            return {points, count};
+        }
+        function badgeStyleForPoints(points) {
+            let icon = '💤', bgStyle = 'background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;';
+            if (points >= 39) { icon = '🔥'; bgStyle = 'background-color: #dc3545; color: white;'; }
+            else if (points >= 26) { icon = '🥵'; bgStyle = 'background-color: #fd7e14; color: white;'; }
+            else if (points >= 16) { icon = '🟡'; bgStyle = 'background-color: #ffc107; color: #212529;'; }
+            else if (points >= 6) { icon = '🟢'; bgStyle = 'background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;'; }
+            return {icon, bgStyle};
+        }
+
+        // Snapshot "this week" para todos los owners → futura columna "Last Week"
+        const thisMondayKey = ymdLocal(weeks[0].start);
+        const snapshotThisWeek = {};
+        owners.forEach(o => { snapshotThisWeek[o] = pointsForOwnerWeek(o, weeks[0]); });
+        saveSnapshot(thisMondayKey, snapshotThisWeek);
+
+        // Snapshot de la semana pasada (si existe)
+        const lastMonday = new Date(weeks[0].start); lastMonday.setDate(lastMonday.getDate() - 7);
+        const lastWeekSnap = getSnapshotForWeek(ymdLocal(lastMonday));
+
         tbody.innerHTML = '';
         owners.forEach(owner => {
-            let rowHtml = `<tr><td class="fw-bold ps-3">${owner}</td>`;
-            weeks.forEach(week => {
-                let points = 0; let count = 0;
-                trrList.forEach(item => {
-                    if ((item.ownerName || 'Unassigned') !== owner) return;
-                    if (['Parked', 'Not Started', 'Closed'].includes(item.projectStatus)) return;
-                    const pStart = new Date(item.startDate);
-                    const pEnd = new Date(item.endDate);
-                    if (pStart <= week.end && pEnd >= week.start) {
-                        const compScore = { 'Low': 1, 'Medium': 2, 'High': 4 };
-                        const workScore = { 'Light': 0, 'Normal': 1, 'Heavy': 3 };
-                        const cVal = compScore[item.complexity] || 2;
-                        const wVal = (workScore[item.workload] !== undefined) ? workScore[item.workload] : 1; 
-                        points += (cVal + wVal);
-                        count++;
-                    }
-                });
-                let icon = '💤'; let bgStyle = 'background-color: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6;';
-                if (points >= 39) { icon = '🔥'; bgStyle = 'background-color: #dc3545; color: white;'; } 
-                else if (points >= 26) { icon = '🥵'; bgStyle = 'background-color: #fd7e14; color: white;'; } 
-                else if (points >= 16) { icon = '🟡'; bgStyle = 'background-color: #ffc107; color: #212529;'; } 
-                else if (points >= 6) { icon = '🟢'; bgStyle = 'background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc;'; }
-                if (points === 0) rowHtml += `<td class="forecast-cell"><div class="forecast-badge" style="${bgStyle}">${icon} Free</div></td>`;
-                else rowHtml += `<td class="forecast-cell"><div class="forecast-badge" style="${bgStyle}"><span class="me-2 fs-6">${icon}</span><span><strong>${points} pts</strong> <small>(${count})</small></span></div></td>`;
+            const isMe = ttUser && owner.toLowerCase().trim() === ttUser;
+            // Badge del banco de horas junto al nombre, solo si es el usuario y TT lo tiene
+            let ownerCell = `<td class="fw-bold ps-3">${owner}`;
+            if (isMe && ttData && ttData.balance) {
+                const bs = ttData.balance.balance_sec;
+                const cls = bs >= 0 ? 'bg-success' : (bs < -8*3600 ? 'bg-danger' : 'bg-warning text-dark');
+                ownerCell += ` <span class="badge ${cls} ms-1" title="Banco de horas TimeTracker" style="font-size:.65rem;">Banco ${bs>=0?'+':'-'}${fmtHm(Math.abs(bs))}</span>`;
+            }
+            ownerCell += `</td>`;
+            let rowHtml = `<tr>${ownerCell}`;
+
+            // ── Celda LAST WEEK ──
+            // Combina: puntos del snapshot (planificado que se guardó ese lunes) + horas reales TT (solo para el user)
+            let lwSnap = lastWeekSnap ? lastWeekSnap[owner] : null;
+            let lwBadge = '';
+            if (lwSnap && lwSnap.count > 0) {
+                const {icon, bgStyle} = badgeStyleForPoints(lwSnap.points);
+                lwBadge = `<div class="forecast-badge" style="${bgStyle}; opacity:.85;" title="Planificado que había ese lunes"><span class="me-2 fs-6">${icon}</span><span><strong>${lwSnap.points} pts</strong> <small>(${lwSnap.count})</small></span></div>`;
+            }
+            let lwHours = '';
+            if (isMe && ttData && ttData.week_previous) {
+                const pw = ttData.week_previous;
+                const pct = pw.target_sec > 0 ? Math.round(pw.total_sec / pw.target_sec * 100) : 0;
+                const cls = pct >= 110 ? 'text-danger' : (pct >= 90 ? 'text-success' : (pct >= 60 ? 'text-warning' : 'text-muted'));
+                lwHours = `<div class="small mt-1 ${cls}" style="font-weight:600;" title="Horas reales de TimeTracker">⏱ ${fmtHm(pw.total_sec)} / ${fmtHm(pw.target_sec)} · ${pct}%</div>`;
+            }
+            if (lwBadge || lwHours) {
+                rowHtml += `<td class="forecast-cell" style="background:#f8f9fa;">${lwBadge}${lwHours}</td>`;
+            } else {
+                rowHtml += '<td class="forecast-cell text-muted" style="background:#f8f9fa;">—</td>';
+            }
+
+            // ── Celdas de las 4 semanas ──
+            weeks.forEach((week, weekIdx) => {
+                const {points, count} = weekIdx === 0 ? snapshotThisWeek[owner] : pointsForOwnerWeek(owner, week);
+                const {icon, bgStyle} = badgeStyleForPoints(points);
+
+                // Overlay TimeTracker en "This Week" para el usuario
+                let ttOverlay = '';
+                let cellBorder = '';
+                if (isMe && weekIdx === 0 && ttData && ttData.week) {
+                    const wSec = ttData.week.total_sec;
+                    const wTgt = ttData.week.target_sec || 1;
+                    const pct  = Math.round(wSec / wTgt * 100);
+                    ttOverlay = `<div class="small mt-1" style="font-weight:500;">⏱ ${fmtHm(wSec)} / ${fmtHm(wTgt)} · ${pct}%</div>`;
+                    if (pct >= 110) cellBorder = 'box-shadow: 0 0 0 3px #dc3545 inset; border-radius: 8px;';
+                    else if (pct >= 90) cellBorder = 'box-shadow: 0 0 0 3px #198754 inset; border-radius: 8px;';
+                    else if (pct >= 60) cellBorder = 'box-shadow: 0 0 0 3px #ffc107 inset; border-radius: 8px;';
+                }
+                const cellStyle = cellBorder ? ` style="${cellBorder}"` : '';
+                if (points === 0) rowHtml += `<td class="forecast-cell"${cellStyle}><div class="forecast-badge" style="${bgStyle}">${icon} Free</div>${ttOverlay}</td>`;
+                else rowHtml += `<td class="forecast-cell"${cellStyle}><div class="forecast-badge" style="${bgStyle}"><span class="me-2 fs-6">${icon}</span><span><strong>${points} pts</strong> <small>(${count})</small></span></div>${ttOverlay}</td>`;
             });
             rowHtml += '</tr>';
             tbody.innerHTML += rowHtml;
@@ -909,16 +1648,21 @@ function renderSidebarStats() {
             localStorage.setItem('pov_radar_default_owner', defaultOwner);
         }
         const selectedOptions = Array.from(document.getElementById('cortexProduct').selectedOptions).map(opt => opt.value);
+        const lossReasonRaw = document.getElementById('lossReason').value;
+        const lossReasonFinal = lossReasonRaw === 'Other'
+            ? ('Other: ' + (document.getElementById('lossReasonOther').value || '').trim())
+            : lossReasonRaw;
         const trrData = {
             id: document.getElementById('trrId').value || Date.now().toString(),
             trrName: document.getElementById('trrName').value,
             creationDate: document.getElementById('creationDate').value,
             accountName: document.getElementById('accountName').value,
             ownerName: currentOwnerInput || 'Unassigned',
+            district: document.getElementById('district').value.trim(),
             cortexProduct: selectedOptions.join(', '),
-            
+
             engagementType: document.getElementById('engagementType').value,
-            oppAmount: document.getElementById('oppAmount').value, 
+            oppAmount: document.getElementById('oppAmount').value,
 
             projectStatus: document.getElementById('projectStatus').value,
             sfdcTrrLink: document.getElementById('sfdcTrrLink').value,
@@ -931,11 +1675,31 @@ function renderSidebarStats() {
             progress: document.getElementById('progress').value,
             nextSteps: document.getElementById('nextSteps').value,
             challenges: document.getElementById('challenges').value,
-            comments: document.getElementById('comments').value
+            comments: document.getElementById('comments').value,
+
+            // Nuevos campos de outcome
+            technicalOutcome:   document.getElementById('technicalOutcome').value || '',
+            commercialOutcome:  document.getElementById('commercialOutcome').value || '',
+            finalAmount:        document.getElementById('finalAmount').value || '',
+            lossReason:         lossReasonFinal || '',
+            closedDate:         document.getElementById('closedDate').value || '',
         };
-        // Si el usuario marca el TRR como Closed, poner Est. End Date = hoy
+
+        // Validación obligatoria al cerrar
         if (trrData.projectStatus === 'Closed') {
-        trrData.endDate = getTodayLocalISO();
+            const isOpp = trrData.engagementType === 'Opportunity';
+            const errors = [];
+            if (!trrData.closedDate) errors.push('Actual Close Date is required to close.');
+            if (!trrData.technicalOutcome) errors.push('Technical Outcome is required to close.');
+            if (isOpp) {
+                if (!trrData.commercialOutcome) errors.push('Commercial Outcome is required to close an Opportunity.');
+                if (trrData.commercialOutcome === 'Won' && !(parseFloat(trrData.finalAmount) > 0)) errors.push('Final Amount is required and must be > 0 for a Won Opportunity.');
+            }
+            if (errors.length) {
+                alert('⚠ Cannot close TRR:\n\n' + errors.join('\n'));
+                return;
+            }
+            // endDate (Est. End Date) NO se toca — es la estimación original del usuario.
         }
 
         const existingIndex = trrList.findIndex(t => t.id === trrData.id);
@@ -960,6 +1724,7 @@ function renderSidebarStats() {
         document.getElementById('creationDate').value = item.creationDate;
         document.getElementById('accountName').value = item.accountName;
         document.getElementById('ownerName').value = item.ownerName || '';
+        document.getElementById('district').value = item.district || '';
         const products = (item.cortexProduct || '').split(', ');
         const select = document.getElementById('cortexProduct');
         Array.from(select.options).forEach(opt => opt.selected = products.includes(opt.value));
@@ -979,6 +1744,24 @@ function renderSidebarStats() {
         document.getElementById('nextSteps').value = item.nextSteps || '';
         document.getElementById('challenges').value = item.challenges || '';
         document.getElementById('comments').value = item.comments || '';
+
+        // Load outcome fields
+        document.getElementById('technicalOutcome').value  = item.technicalOutcome  || '';
+        document.getElementById('commercialOutcome').value = item.commercialOutcome || '';
+        document.getElementById('finalAmount').value       = item.finalAmount       || '';
+        document.getElementById('closedDate').value        = item.closedDate        || '';
+        // Loss reason may have been stored as "Other: ..." — split back
+        const lrRaw = item.lossReason || '';
+        if (lrRaw.startsWith('Other:')) {
+            document.getElementById('lossReason').value = 'Other';
+            document.getElementById('lossReasonOther').value = lrRaw.slice(6).trim();
+            document.getElementById('lossReasonOther').style.display = '';
+        } else {
+            document.getElementById('lossReason').value = lrRaw;
+            document.getElementById('lossReasonOther').value = '';
+            document.getElementById('lossReasonOther').style.display = 'none';
+        }
+
         document.getElementById('formTitle').innerText = 'Edit Report: ' + item.trrName;
         showCreateForm(false); 
     }
@@ -998,7 +1781,15 @@ function renderSidebarStats() {
         if(item.engagementType === 'Events') engBadge = '<span class="badge badge-event">Event</span>';
 
         const cleanAmt = item.oppAmount ? parseFloat(item.oppAmount.toString().replace(/[",$\s]/g, '')) : 0;
-        const amountDisplay = cleanAmt > 0 ? `<h3 class="text-success fw-bold">${formatCurrency(cleanAmt)}</h3>` : '';
+        const finalAmt = parseFloat(item.finalAmount) || 0;
+        let amountDisplay = '';
+        if (item.projectStatus === 'Closed' && item.commercialOutcome === 'Won' && finalAmt > 0) {
+            amountDisplay = `<h3 class="text-success fw-bold">${formatCurrency(finalAmt)} <small class="text-muted" style="font-size:.6em;">final</small></h3>`;
+        } else if (cleanAmt > 0) {
+            amountDisplay = `<h3 class="text-success fw-bold">${formatCurrency(cleanAmt)}</h3>`;
+        }
+        const outcomeLine = outcomeBadge(item);
+        const lossLine = item.lossReason ? `<div class="small text-muted mt-1"><i class="fas fa-info-circle"></i> Loss reason: ${item.lossReason}</div>` : '';
 
         modalBody.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
@@ -1007,6 +1798,7 @@ function renderSidebarStats() {
             <div class="mb-3">
                 ${productsHtml}
                 <span class="badge bg-light text-dark border ms-1">Owner: ${item.ownerName || 'N/A'}</span>
+                ${item.district ? `<span class="badge bg-light text-dark border ms-1"><i class="fas fa-map-marker-alt me-1 text-muted"></i>${item.district}</span>` : ''}
             </div>
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>${amountDisplay}</div>
@@ -1015,6 +1807,7 @@ function renderSidebarStats() {
                     ${linksHtml}
                 </div>
             </div>
+            ${outcomeLine ? `<div class="mb-2">${outcomeLine}${lossLine}</div>` : ''}
             <hr>
             <div class="row">
                 <div class="col-6"><strong>Start:</strong> ${item.startDate || 'N/A'}</div>
@@ -1118,7 +1911,10 @@ function renderSidebarStats() {
                 </td>
                 <td><div class="fw-bold text-truncate-cell" title="${item.accountName}">${formatAccountName(item.accountName)}</div></td>
                 <td>${amountText}</td>
-                <td><span class="status-badge ${statusClass}">${item.projectStatus}</span></td>
+                <td>
+                    <span class="status-badge ${statusClass}">${item.projectStatus}</span>
+                    <div class="mt-1" style="font-size:.65rem; line-height:1.4;">${outcomeBadge(item)}</div>
+                </td>
                 <td>${timelineText} ${effortBadge}</td>
                 <td style="max-width: 250px;">
                     <div class="text-truncate-cell" title="${item.progress || ''}">${item.progress}</div>
@@ -1174,9 +1970,12 @@ function renderSidebarStats() {
             const cleanAccountName = formatAccountName(item.accountName).replace(/\|/g, '-'); 
             const uniqueLabel = `${currentOwner}|${cleanAccountName}|${index}`; 
             
+            // Para closed TRRs usamos closedDate (fecha real de cierre), no la estimación.
+            // Para activos usamos endDate (planificado). Fallback cruzado si falta uno u otro.
+            const barEndDate = trrEndDate(item);
             seriesData.push({
                 x: uniqueLabel,
-                y: [new Date(item.startDate).getTime(), new Date(item.endDate).getTime()],
+                y: [new Date(item.startDate).getTime(), new Date(barEndDate).getTime()],
                 fillColor: barColor, isHeader: false, trrName: item.trrName, ownerName: currentOwner,
                 account: item.accountName, product: item.cortexProduct, complexity: item.complexity, workload: item.workload,
                 realId: item.id, barLabel: item.cortexProduct || 'Unknown'
@@ -1279,8 +2078,42 @@ function importSFDC(input) {
 
     // ✅ Normaliza CRLF (Windows) para evitar \r en el último campo
     const rows = text.replace(/\r/g, '').split('\n');
-    const dataRows = rows.slice(1);
+    if (rows.length < 2) { alert('CSV vacío o sin filas de datos.'); return; }
 
+    // ── Mapeo de columnas basado en cabecera (robusto ante cambios de columnas en SFDC) ──
+    // El CSV tiene dos cabeceras muy similares: "Technical Resource Request Id" (nombre TRRxxx)
+    // y "Technical Resource Request ID" (id interno SFDC). Se distinguen por orden de aparición.
+    const headerCells = parseCSVLine(rows[0]).map(h => h.replace(/"/g, '').trim().toLowerCase());
+    const headerIdx = {};
+    headerCells.forEach((h, i) => {
+      if (!headerIdx[h]) headerIdx[h] = [];
+      headerIdx[h].push(i);
+    });
+    const findAll = (name) => headerIdx[name.toLowerCase()] || [];
+    const findFirst = (...names) => {
+      for (const n of names) { const a = findAll(n); if (a.length) return a[0]; }
+      return -1;
+    };
+    const or = (idx, fallback) => (idx >= 0 ? idx : fallback);
+
+    const trrNameOcc = findAll('technical resource request id');
+    const iTrrName   = trrNameOcc.length ? trrNameOcc[0] : 0;
+    const iSfdcTrrId = trrNameOcc.length >= 2 ? trrNameOcc[1] : or(findFirst('technical resource request id (18 digit)'), 4);
+    const iCreated   = or(findFirst('created date'), 1);
+    const iAccount   = or(findFirst('account name', 'account'), 2);
+    const iTech      = findFirst('all subdomains', 'technology', 'product', 'cortex product'); // opcional
+    const iSfdcOpp   = or(findFirst('18 digit opportunity id', 'opportunity id'), 5);
+    const iSfdcExt   = or(findFirst('opportunity extension: opportunity extension name', 'opportunity extension name', 'extension name'), 6);
+    const iEngType   = or(findFirst('engagement type'), 7);
+    const iAmount    = or(findFirst('net opportunity amount', 'opportunity amount', 'amount'), 8);
+    const iDistrict  = findFirst('account owner district', 'district'); // opcional
+    const iOwner     = or(findFirst('assigned consultant: full name', 'assigned consultant', 'assigned resource', 'owner'), 9);
+    const iStatus    = or(findFirst('engagement status', 'status'), 10);
+    const iClosedReason = findFirst('closed reason', 'close reason');
+
+    const cell = (row, idx) => (idx >= 0 && idx < row.length) ? (row[idx] || '').replace(/"/g, '').trim() : '';
+
+    const dataRows = rows.slice(1);
     const sfdcMap = new Map();
     const linkBase = 'https://paloaltonetworks.lightning.force.com/lightning/r';
 
@@ -1288,34 +2121,41 @@ function importSFDC(input) {
       if (!rowString || rowString.trim() === '') return;
 
       const row = parseCSVLine(rowString);
-      if (!row || row.length < 11) return; // ideal: 12, pero 11 cubre amount/owner/status
+      if (!row || row.length < 3) return;
 
-      let trrId = (row[0] || '').replace(/"/g, '').trim();
+      const trrId = cell(row, iTrrName);
       if (!trrId.toUpperCase().startsWith('TRR')) return;
 
-      // CSV indices:
-      // 7 Engagement Type, 8 Net Opportunity Amount, 9 Assigned Resource, 10 Engagement Status
-      const engType = (row[7] || '').replace(/"/g, '').trim();
+      const engType = cell(row, iEngType);
 
-      let rawAmount = (row[8] || '').replace(/"/g, '').trim();
+      let rawAmount = cell(row, iAmount);
       let cleanAmount = rawAmount.replace(/[^0-9.-]+/g, '');
       if (cleanAmount === '' || isNaN(parseFloat(cleanAmount))) cleanAmount = '0';
 
       // ✅ REGLA: si es Post Sales, fuerza amount = 0
       if (engType === 'Post Sales') cleanAmount = '0';
 
+      // Defensa: si owner viene como "Active"/"Inactive" y status trae un nombre, intercambia
+      let owner = cell(row, iOwner);
+      let statusRaw = cell(row, iStatus);
+      if ((owner === 'Active' || owner === 'Inactive') && statusRaw && statusRaw !== 'Active' && statusRaw !== 'Inactive') {
+        [owner, statusRaw] = [statusRaw, owner];
+      }
+
       sfdcMap.set(trrId, {
-        createdDate: (row[1] || '').replace(/"/g, '').trim(),
-        account: (row[2] || '').replace(/"/g, '').trim(),
-        rawTech: (row[3] || '').replace(/"/g, '').trim(),
-        sfdcTrrId: (row[4] || '').replace(/"/g, '').trim(),
-        sfdcOppId: (row[5] || '').replace(/"/g, '').trim(),
-        sfdcExtId: (row[6] || '').replace(/"/g, '').trim(),
+        createdDate: cell(row, iCreated),
+        account: cell(row, iAccount),
+        rawTech: cell(row, iTech),
+        sfdcTrrId: cell(row, iSfdcTrrId),
+        sfdcOppId: cell(row, iSfdcOpp),
+        sfdcExtId: cell(row, iSfdcExt),
 
         engType: engType,
         oppAmount: cleanAmount,
-        owner: (row[9] || '').replace(/"/g, '').trim(),
-        statusRaw: (row[10] || '').replace(/"/g, '').trim()
+        district: cell(row, iDistrict),
+        owner: owner,
+        statusRaw: statusRaw,
+        closedReason: cell(row, iClosedReason)
       });
     });
 
@@ -1359,6 +2199,7 @@ function importSFDC(input) {
           creationDate: isoDate,
           accountName: data.account,
           ownerName: data.owner,
+          district: data.district || '',
           cortexProduct: techs,
 
           // ✅ usar el tipo real del CSV
@@ -1390,22 +2231,39 @@ function importSFDC(input) {
 
         existing.accountName = data.account;
         existing.ownerName = data.owner;
-        existing.cortexProduct = (data.rawTech || '')
-          .split(';')
-          .map((t) => t.trim())
-          .filter(Boolean)
-          .join(', ');
+        if (data.district) existing.district = data.district;
+
+        // Solo sobrescribe cortexProduct si el CSV trae dato (evita borrar valor manual del usuario)
+        if (data.rawTech && data.rawTech.trim() !== '') {
+          existing.cortexProduct = data.rawTech
+            .split(';')
+            .map((t) => t.trim())
+            .filter(Boolean)
+            .join(', ');
+        }
 
         if (data.engType) existing.engagementType = data.engType;
 
         // ✅ Siempre actualiza amount (ya viene 0 si Post Sales)
         existing.oppAmount = data.oppAmount;
 
+        // Refresca links SFDC por si venían mal de imports anteriores rotos
+        if (data.sfdcTrrId) existing.sfdcTrrLink = `${linkBase}/CE_Request__c/${data.sfdcTrrId}/view`;
+        if (data.sfdcOppId) existing.sfdcOppLink = `${linkBase}/Opportunity/${data.sfdcOppId}/view`;
+        if (data.sfdcExtId) existing.sfdcTechValLink = `${linkBase}/Opportunity_Extension__c/${data.sfdcExtId}/view`;
+
+        // Auto-repara projectStatus "Not Started" heredado del import roto anterior
+        if (existing.projectStatus === 'Not Started') {
+          if (data.statusRaw === 'Active') existing.projectStatus = 'On Track';
+          else if (data.statusRaw === 'Inactive') existing.projectStatus = 'Parked';
+        }
+
         updatedCount++;
       }
     });
 
     // ---- AUTO-CLOSE MISSING TRRs ----
+    const autoClosedIds = [];
     trrList.forEach((item) => {
       if (!item.id || !item.id.toUpperCase().startsWith('TRR')) {
         manualSkippedCount++;
@@ -1413,11 +2271,13 @@ function importSFDC(input) {
       }
       if (item.projectStatus !== 'Closed' && !sfdcMap.has(item.id)) {
         item.projectStatus = 'Closed';
-        item.endDate = getTodayLocalISO();
+        // Default de closedDate = hoy (editable en el modal bulk). endDate (estimación) no se toca.
+        item.closedDate = getTodayLocalISO();
 
         const dateStr = new Date().toLocaleDateString();
         item.progress = (item.progress || '') + `\n[${dateStr}] Auto-closed: Missing in SFDC export.`;
         closedCount++;
+        autoClosedIds.push(item.id);
       }
     });
 
@@ -1427,7 +2287,12 @@ function importSFDC(input) {
     );
 
     input.value = '';
-    showDashboard();
+    // Si hubo auto-cierres, abre el modal de outcomes en bloque
+    if (autoClosedIds.length > 0) {
+      openBulkOutcomeModal(autoClosedIds);
+    } else {
+      showDashboard();
+    }
   };
 
   reader.readAsText(file);
@@ -1436,6 +2301,713 @@ function getTodayLocalISO() {
   const d = new Date();
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tz).toISOString().split('T')[0]; // YYYY-MM-DD
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  FISCAL YEAR SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════
+const FY_STORAGE_KEY = 'pov_radar_fy_start_month';
+const FY_DEFAULT_MONTH = 8; // Agosto por default (Palo Alto)
+
+function getFYStartMonth() {
+    const v = parseInt(localStorage.getItem(FY_STORAGE_KEY) || '', 10);
+    return (v >= 1 && v <= 12) ? v : FY_DEFAULT_MONTH;
+}
+function setFYStartMonth(m) {
+    m = parseInt(m, 10);
+    if (m >= 1 && m <= 12) {
+        localStorage.setItem(FY_STORAGE_KEY, String(m));
+        return true;
+    }
+    return false;
+}
+
+// Devuelve el número FY para una fecha dada (p.ej. "FY27" para agosto 2026 en año fiscal PA)
+function getFYForDate(d) {
+    if (!(d instanceof Date)) d = new Date(d);
+    const start = getFYStartMonth();
+    // Si estamos en el mes de start o posterior → FY del año siguiente
+    // (p.ej. Aug 2026 con start=8 → FY27 porque el fiscal year 27 empieza Aug 2026)
+    const y = d.getFullYear();
+    const fyYear = (d.getMonth() + 1) >= start ? y + 1 : y;
+    return fyYear % 100; // "27"
+}
+function getFYBounds(fyTwoDigit) {
+    const start = getFYStartMonth();
+    // FY27 empieza el (start) del año (2027 - 1) = 2026
+    // Ejemplo con start=8: FY27 = Aug 1, 2026 → Jul 31, 2027
+    const startYear = 2000 + fyTwoDigit - 1;
+    const from = new Date(startYear, start - 1, 1);
+    const to   = new Date(startYear + 1, start - 1, 0, 23, 59, 59); // último día del mes anterior al start
+    return {from, to, label: 'FY' + fyTwoDigit};
+}
+function getCurrentFY() { return getFYForDate(new Date()); }
+
+function openFYSettings() {
+    const sel = document.getElementById('fyMonthSelect');
+    sel.value = String(getFYStartMonth());
+    updateFYPreview();
+    sel.onchange = updateFYPreview;
+    new bootstrap.Modal(document.getElementById('fyModal')).show();
+}
+function updateFYPreview() {
+    const m = parseInt(document.getElementById('fyMonthSelect').value, 10);
+    const oldM = getFYStartMonth();
+    // Preview usando el mes elegido temporalmente
+    localStorage.setItem(FY_STORAGE_KEY, String(m));
+    const cur = getFYBounds(getCurrentFY());
+    const prev = getFYBounds(getCurrentFY() - 1);
+    localStorage.setItem(FY_STORAGE_KEY, String(oldM));
+    const f = d => d.toISOString().substring(0,10);
+    document.getElementById('fyPreview').innerHTML =
+        `Con este mes: <strong>${cur.label}</strong> = ${f(cur.from)} → ${f(cur.to)}<br>` +
+        `<strong>${prev.label}</strong> = ${f(prev.from)} → ${f(prev.to)}`;
+}
+function saveFYSettings() {
+    const m = document.getElementById('fyMonthSelect').value;
+    if (setFYStartMonth(m)) {
+        bootstrap.Modal.getInstance(document.getElementById('fyModal')).hide();
+        if (document.getElementById('metricsView').classList.contains('active')) renderMetrics();
+    } else {
+        alert('Mes inválido');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  METRICS DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════
+const metricsCharts = {};
+
+function getMetricsDateRange() {
+    const mode = document.getElementById('mfDateRange').value;
+    const today = new Date();
+    let from, to = today, label = '';
+    if (mode === 'fy_current') {
+        const b = getFYBounds(getCurrentFY());
+        from = b.from; to = b.to; label = b.label;
+    }
+    else if (mode === 'fy_last') {
+        const b = getFYBounds(getCurrentFY() - 1);
+        from = b.from; to = b.to; label = b.label;
+    }
+    else if (mode === 'ytd') from = new Date(today.getFullYear(), 0, 1);
+    else if (mode === 'q_current') {
+        const q = Math.floor(today.getMonth() / 3);
+        from = new Date(today.getFullYear(), q * 3, 1);
+    }
+    else if (mode === 'q_last') {
+        const q = Math.floor(today.getMonth() / 3) - 1;
+        const y = q < 0 ? today.getFullYear() - 1 : today.getFullYear();
+        const qm = ((q % 4) + 4) % 4;
+        from = new Date(y, qm * 3, 1);
+        to = new Date(y, qm * 3 + 3, 0);
+    }
+    else if (mode === 'last_90')  from = new Date(today.getTime() - 90 * 86400000);
+    else if (mode === 'last_365') from = new Date(today.getTime() - 365 * 86400000);
+    else if (mode === 'all')      from = new Date(2000, 0, 1);
+    else if (mode === 'custom') {
+        const f = document.getElementById('mfFrom').value;
+        const t = document.getElementById('mfTo').value;
+        from = f ? new Date(f) : new Date(2000, 0, 1);
+        to   = t ? new Date(t) : new Date();
+    }
+    return {from, to, label};
+}
+
+function onMetricsFiltersChanged() {
+    const isCustom = document.getElementById('mfDateRange').value === 'custom';
+    document.getElementById('mfCustomFromWrap').style.display = isCustom ? '' : 'none';
+    document.getElementById('mfCustomToWrap').style.display   = isCustom ? '' : 'none';
+    renderMetrics();
+}
+
+function populateMetricsFilters() {
+    // Products
+    const prodSel = document.getElementById('mfProduct');
+    const currentProd = prodSel.value;
+    const products = new Set();
+    trrList.forEach(t => (t.cortexProduct || '').split(', ').filter(Boolean).forEach(p => products.add(p)));
+    prodSel.innerHTML = '<option value="">All products</option>' +
+        [...products].sort().map(p => `<option value="${p}">${p}</option>`).join('');
+    prodSel.value = currentProd;
+    // Owners
+    const ownerSel = document.getElementById('mfOwner');
+    const currentOwner = ownerSel.value;
+    const owners = new Set();
+    trrList.forEach(t => { if (t.ownerName) owners.add(t.ownerName); });
+    ownerSel.innerHTML = '<option value="">All owners</option>' +
+        [...owners].sort().map(o => `<option value="${o}">${o}</option>`).join('');
+    ownerSel.value = currentOwner;
+}
+
+function metricsCurrentFilters() {
+    const {from, to, label} = getMetricsDateRange();
+    return {
+        from, to, label,
+        product: document.getElementById('mfProduct').value,
+        owner:   document.getElementById('mfOwner').value,
+    };
+}
+
+// Filtra por product/owner. Los KPIs principales trabajan solo con Opps (se aplica dentro).
+function metricsFilterTRRs(f) {
+    return trrList.filter(t => {
+        if (f.product && !((t.cortexProduct || '').split(', ').includes(f.product))) return false;
+        if (f.owner && (t.ownerName || 'Unassigned') !== f.owner) return false;
+        return true;
+    });
+}
+function inRange(dateStr, from, to) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d)) return false;
+    return d >= from && d <= to;
+}
+
+// Fecha canónica del "cuándo terminó" un TRR (para agrupar por FY/mes/quarter):
+// - Actual Close Date (closedDate) es la fecha que el usuario confirmó al cerrar → fuente de verdad.
+// - Fallback a Est. End Date (endDate) solo para TRRs antiguos sin closedDate.
+function trrEndDate(t) { return t.closedDate || t.endDate || ''; }
+
+function computeMetrics(filters) {
+    // Dashboard principal: SOLO Opportunities (win/loss no aplica a otros tipos)
+    const base = metricsFilterTRRs(filters).filter(t => (t.engagementType || 'Opportunity') === 'Opportunity');
+    const {from, to} = filters;
+    const closed = base.filter(t => t.projectStatus === 'Closed' && inRange(trrEndDate(t), from, to));
+    const active = base.filter(t => t.projectStatus !== 'Closed');
+    const opps   = closed;
+
+    const won  = opps.filter(t => t.commercialOutcome === 'Won');
+    const lost = opps.filter(t => t.commercialOutcome === 'Lost');
+    const noDec= opps.filter(t => t.commercialOutcome === 'No Decision');
+
+    const techW  = closed.filter(t => t.technicalOutcome === 'Technical Win');
+    const techL  = closed.filter(t => t.technicalOutcome === 'Technical Loss');
+    const techP  = closed.filter(t => t.technicalOutcome === 'Partial');
+
+    const sumAmount = (arr, field) => arr.reduce((s, t) => s + (parseFloat((t[field]||'').toString().replace(/[",$\s]/g,'')) || 0), 0);
+    const totalWonAmount = sumAmount(won, 'finalAmount');
+    const totalLostAmount = sumAmount(lost, 'oppAmount');
+    const pipelineActive = sumAmount(base.filter(t => t.projectStatus !== 'Closed' && (t.engagementType||'Opportunity') === 'Opportunity'), 'oppAmount');
+    const atRiskAmount   = sumAmount(base.filter(t => t.projectStatus === 'At Risk' && (t.engagementType||'Opportunity') === 'Opportunity'), 'oppAmount');
+    const avgDeal = won.length ? totalWonAmount / won.length : 0;
+
+    // Win rates
+    const commDenom = won.length + lost.length;
+    const winRateComm = commDenom ? (won.length / commDenom) : 0;
+    const techDenom = techW.length + techL.length + techP.length;
+    const winRateTech = techDenom ? (techW.length / techDenom) : 0;
+
+    // Ciclo medio de venta (Won): días entre startDate y closedDate|endDate
+    const cycles = won.map(t => {
+        const s = new Date(t.startDate); const e = new Date(trrEndDate(t));
+        return (!isNaN(s) && !isNaN(e)) ? (e - s) / 86400000 : null;
+    }).filter(x => x !== null && x >= 0);
+    const avgCycleDays = cycles.length ? cycles.reduce((a,b) => a+b, 0) / cycles.length : 0;
+
+    // Tasa de abandono: opps que pasaron por Parked antes de cerrarse
+    // (Aproximado: buscamos "Parked" en el campo progress de la timeline. Si no, 0.)
+    const parkedTouched = opps.filter(t => /parked/i.test(t.progress || '')).length;
+    const abandonRate = opps.length ? (parkedTouched / opps.length) : 0;
+
+    // Amount por mes (won)
+    const byMonth = {};
+    won.forEach(t => {
+        const d = new Date(trrEndDate(t));
+        if (isNaN(d)) return;
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        byMonth[key] = (byMonth[key] || 0) + (parseFloat((t.finalAmount||'').toString().replace(/[",$\s]/g,'')) || 0);
+    });
+
+    // Win rate por producto
+    const byProduct = {};
+    opps.forEach(t => {
+        (t.cortexProduct || '').split(', ').filter(Boolean).forEach(p => {
+            if (!byProduct[p]) byProduct[p] = {won: 0, lost: 0};
+            if (t.commercialOutcome === 'Won')  byProduct[p].won++;
+            if (t.commercialOutcome === 'Lost') byProduct[p].lost++;
+        });
+    });
+
+    // Loss reasons
+    const lossReasons = {};
+    [...lost, ...noDec, ...techL].forEach(t => {
+        const r = (t.lossReason || '').replace(/^Other:\s*/i, 'Other: ');
+        if (r) lossReasons[r] = (lossReasons[r] || 0) + 1;
+    });
+
+    // Matriz Tech × Commercial (solo Opps)
+    const matrix = {
+        'Technical Win': {Won: 0, Lost: 0, 'No Decision': 0},
+        'Partial':       {Won: 0, Lost: 0, 'No Decision': 0},
+        'Technical Loss':{Won: 0, Lost: 0, 'No Decision': 0},
+    };
+    opps.forEach(t => {
+        if (matrix[t.technicalOutcome] && matrix[t.technicalOutcome][t.commercialOutcome] !== undefined) {
+            matrix[t.technicalOutcome][t.commercialOutcome]++;
+        }
+    });
+
+    return {
+        total: base.length, active: active.length, closed: closed.length,
+        won: won.length, lost: lost.length, noDec: noDec.length,
+        techW: techW.length, techL: techL.length, techP: techP.length,
+        winRateComm, winRateTech,
+        totalWonAmount, totalLostAmount, pipelineActive, atRiskAmount, avgDeal,
+        avgCycleDays, abandonRate,
+        byMonth, byProduct, lossReasons, matrix,
+        opps,
+    };
+}
+
+function computePrevPeriodMetrics(filters) {
+    // Ventana anterior del mismo tamaño
+    const ms = filters.to - filters.from;
+    const prevTo   = new Date(filters.from.getTime() - 1);
+    const prevFrom = new Date(prevTo.getTime() - ms);
+    return computeMetrics({...filters, from: prevFrom, to: prevTo});
+}
+
+function fmtMoney(n) {
+    if (!n || n === 0) return '$0';
+    if (Math.abs(n) >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
+    if (Math.abs(n) >= 1e3) return '$' + (n/1e3).toFixed(1) + 'k';
+    return '$' + n.toFixed(0);
+}
+function fmtPct(x) { return (x * 100).toFixed(1) + '%'; }
+function deltaArrow(cur, prev, higherIsBetter = true) {
+    if (prev === 0 && cur === 0) return '';
+    if (prev === 0) return '<span class="text-success small ms-1">new</span>';
+    const diff = cur - prev;
+    const pct = (diff / Math.abs(prev)) * 100;
+    const good = higherIsBetter ? diff >= 0 : diff <= 0;
+    const arrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '=');
+    const cls = good ? 'text-success' : 'text-danger';
+    return `<span class="${cls} small ms-1" title="vs periodo anterior">${arrow} ${Math.abs(pct).toFixed(0)}%</span>`;
+}
+
+function renderMetricsKPIs(m, prev) {
+    const kpi = (label, val, delta = '', color = 'primary', icon = '') => `
+        <div class="col-md-3 col-6">
+            <div class="card p-3 h-100" style="border-left:4px solid var(--bs-${color});">
+                <div class="small text-muted text-uppercase fw-bold" style="font-size:.7rem;letter-spacing:.5px;">${icon ? '<i class="'+icon+' me-1"></i>' : ''}${label}</div>
+                <div class="mt-1" style="font-size:1.5rem;font-weight:800;">${val}${delta}</div>
+            </div>
+        </div>`;
+    const box = document.getElementById('metricsKPIs');
+    box.innerHTML =
+        kpi('Win Rate Commercial', fmtPct(m.winRateComm), deltaArrow(m.winRateComm, prev.winRateComm), 'success', 'fas fa-trophy') +
+        kpi('Win Rate Technical',  fmtPct(m.winRateTech), deltaArrow(m.winRateTech, prev.winRateTech), 'info', 'fas fa-wrench') +
+        kpi('Total Won',           fmtMoney(m.totalWonAmount), deltaArrow(m.totalWonAmount, prev.totalWonAmount), 'success', 'fas fa-dollar-sign') +
+        kpi('Avg Deal (Won)',      fmtMoney(m.avgDeal), deltaArrow(m.avgDeal, prev.avgDeal), 'success', 'fas fa-chart-line') +
+        kpi('Pipeline Active',     fmtMoney(m.pipelineActive), deltaArrow(m.pipelineActive, prev.pipelineActive), 'primary', 'fas fa-stream') +
+        kpi('Amount at Risk',      fmtMoney(m.atRiskAmount), deltaArrow(m.atRiskAmount, prev.atRiskAmount, false), 'warning', 'fas fa-exclamation-triangle') +
+        kpi('Avg Sales Cycle',     m.avgCycleDays > 0 ? Math.round(m.avgCycleDays) + 'd' : '—', deltaArrow(m.avgCycleDays, prev.avgCycleDays, false), 'secondary', 'fas fa-clock') +
+        kpi('Abandonment Rate',    fmtPct(m.abandonRate), deltaArrow(m.abandonRate, prev.abandonRate, false), 'danger', 'fas fa-ban');
+}
+
+function renderMetricsCharts(m) {
+    // Destroy previous
+    Object.values(metricsCharts).forEach(c => { try { c.destroy(); } catch(e){} });
+    Object.keys(metricsCharts).forEach(k => delete metricsCharts[k]);
+
+    // Commercial donut
+    metricsCharts.comm = new ApexCharts(document.getElementById('chartCommercial'), {
+        chart: {type: 'donut', height: 220},
+        series: [m.won, m.lost, m.noDec],
+        labels: ['Won', 'Lost', 'No Decision'],
+        colors: ['#198754', '#dc3545', '#6c757d'],
+        legend: {position: 'bottom'},
+    });
+    metricsCharts.comm.render();
+
+    // Technical donut
+    metricsCharts.tech = new ApexCharts(document.getElementById('chartTechnical'), {
+        chart: {type: 'donut', height: 220},
+        series: [m.techW, m.techP, m.techL],
+        labels: ['Technical Win', 'Partial', 'Technical Loss'],
+        colors: ['#0d6efd', '#795548', '#6f1d1b'],
+        legend: {position: 'bottom'},
+    });
+    metricsCharts.tech.render();
+
+    // Matrix as heatmap-like table
+    const matrixBox = document.getElementById('chartMatrix');
+    let mh = '<table class="table table-sm text-center mb-0" style="font-size:.85rem;"><thead><tr><th></th><th>Won</th><th>Lost</th><th>No Dec</th></tr></thead><tbody>';
+    for (const tech of ['Technical Win','Partial','Technical Loss']) {
+        mh += `<tr><th class="text-start small">${tech}</th>`;
+        for (const comm of ['Won','Lost','No Decision']) {
+            const v = m.matrix[tech][comm];
+            const bg = v === 0 ? '#f8f9fa' :
+                (tech === 'Technical Win' && comm === 'Won') ? '#198754' :
+                (tech === 'Technical Loss' && comm === 'Lost') ? '#dc3545' :
+                (tech === 'Technical Win' && comm === 'Lost') ? '#fd7e14' :
+                (tech === 'Technical Loss' && comm === 'Won') ? '#0dcaf0' : '#adb5bd';
+            const col = v === 0 ? '#adb5bd' : '#fff';
+            mh += `<td style="background:${bg};color:${col};font-weight:700;">${v}</td>`;
+        }
+        mh += '</tr>';
+    }
+    mh += '</tbody></table>';
+    matrixBox.innerHTML = mh;
+
+    // Won amount by month
+    const months = Object.keys(m.byMonth).sort();
+    metricsCharts.month = new ApexCharts(document.getElementById('chartByMonth'), {
+        chart: {type: 'bar', height: 260, toolbar: {show: false}},
+        series: [{name: 'Won $', data: months.map(k => m.byMonth[k])}],
+        xaxis: {categories: months},
+        yaxis: {labels: {formatter: v => fmtMoney(v)}},
+        colors: ['#198754'],
+        dataLabels: {enabled: false},
+    });
+    metricsCharts.month.render();
+
+    // Win rate by product
+    const products = Object.keys(m.byProduct).sort();
+    const rates = products.map(p => {
+        const {won, lost} = m.byProduct[p];
+        return won + lost > 0 ? (won / (won + lost) * 100) : 0;
+    });
+    metricsCharts.product = new ApexCharts(document.getElementById('chartByProduct'), {
+        chart: {type: 'bar', height: 260, toolbar: {show: false}},
+        plotOptions: {bar: {horizontal: true, distributed: true}},
+        series: [{name: 'Win rate', data: rates}],
+        xaxis: {categories: products, max: 100, labels: {formatter: v => v.toFixed(0) + '%'}},
+        colors: ['#0d6efd', '#20c997', '#fd7e14', '#6f42c1', '#dc3545', '#198754', '#ffc107', '#0dcaf0'],
+        legend: {show: false},
+        dataLabels: {enabled: true, formatter: v => v.toFixed(0) + '%'},
+    });
+    metricsCharts.product.render();
+
+    // Loss reasons
+    const reasons = Object.keys(m.lossReasons).sort((a,b) => m.lossReasons[b] - m.lossReasons[a]);
+    metricsCharts.loss = new ApexCharts(document.getElementById('chartLossReasons'), {
+        chart: {type: 'bar', height: 220, toolbar: {show: false}},
+        plotOptions: {bar: {horizontal: true, distributed: true}},
+        series: [{name: 'Count', data: reasons.map(r => m.lossReasons[r])}],
+        xaxis: {categories: reasons},
+        colors: ['#dc3545', '#fd7e14', '#ffc107', '#0dcaf0', '#6f42c1', '#20c997', '#0d6efd', '#795548', '#adb5bd'],
+        legend: {show: false},
+        dataLabels: {enabled: true},
+    });
+    metricsCharts.loss.render();
+}
+
+// ═══ Support Activities (Post Sales + Events) ══════════════════════════════
+function trrOverlapsRange(t, from, to) {
+    // Consideramos que un TRR "aparece" en el rango si su intervalo start→end lo toca
+    const sd = t.startDate ? new Date(t.startDate) : null;
+    const ed = trrEndDate(t) ? new Date(trrEndDate(t)) : new Date();
+    if (!sd) return false;
+    return sd <= to && ed >= from;
+}
+
+// Amount efectivo de un TRR (finalAmount si Won + closed, si no oppAmount)
+function trrEffectiveAmount(t) {
+    const fin = parseFloat((t.finalAmount || '').toString().replace(/[",$\s]/g, '')) || 0;
+    if (t.projectStatus === 'Closed' && t.commercialOutcome === 'Won' && fin > 0) return fin;
+    return parseFloat((t.oppAmount || '').toString().replace(/[",$\s]/g, '')) || 0;
+}
+
+// Engagement mix: counts en rango por tipo (aplica product/owner filters)
+function computeEngagementMix(filters) {
+    const {from, to} = filters;
+    const base = metricsFilterTRRs(filters).filter(t => trrOverlapsRange(t, from, to));
+    const bytype = {'Opportunity': 0, 'Post Sales': 0, 'Events': 0};
+    base.forEach(t => { const k = t.engagementType || 'Opportunity'; if (bytype[k] !== undefined) bytype[k]++; });
+    return {total: base.length, opp: bytype['Opportunity'], post: bytype['Post Sales'], event: bytype['Events']};
+}
+
+function renderEngagementMix(mix) {
+    const pill = (label, val, color, icon) => `
+        <div class="col-md-3 col-6">
+            <div class="p-2 px-3 d-flex align-items-center justify-content-between rounded border" style="background:#fff;">
+                <div>
+                    <div class="text-muted text-uppercase" style="font-size:.6rem;letter-spacing:.5px;font-weight:700;">
+                        <i class="${icon} me-1" style="color:${color};"></i>${label}
+                    </div>
+                    <div style="font-size:1.25rem;font-weight:800;">${val}</div>
+                </div>
+                <span class="badge" style="background:${color};opacity:.85;">TRRs</span>
+            </div>
+        </div>`;
+    document.getElementById('engagementMix').innerHTML =
+        pill('Total in range',       mix.total, '#0d6efd', 'fas fa-layer-group') +
+        pill('Opportunities',        mix.opp,   '#0dcaf0', 'fas fa-briefcase') +
+        pill('Post Sales',           mix.post,  '#6f42c1', 'fas fa-phone-alt') +
+        pill('Events',               mix.event, '#ffc107', 'fas fa-calendar-star');
+}
+function computeSupport(filters) {
+    const {from, to} = filters;
+    const base = metricsFilterTRRs(filters);
+    const posts  = base.filter(t => (t.engagementType || '') === 'Post Sales' && trrOverlapsRange(t, from, to));
+    const events = base.filter(t => (t.engagementType || '') === 'Events'     && trrOverlapsRange(t, from, to));
+    // Set de cuentas que tienen al menos una Opp (en cualquier estado)
+    const oppAccounts = new Set(
+        trrList.filter(t => (t.engagementType || 'Opportunity') === 'Opportunity')
+               .map(t => (t.accountName || '').toLowerCase().trim())
+               .filter(Boolean)
+    );
+    const supportOnOpp   = [...posts, ...events].filter(t => oppAccounts.has((t.accountName || '').toLowerCase().trim()));
+    const supportStandalone = [...posts, ...events].filter(t => !oppAccounts.has((t.accountName || '').toLowerCase().trim()));
+
+    // Amounts por tipo (Post/Events tienen amount desde SFDC en muchos casos)
+    const sumAmt = arr => arr.reduce((s, t) => s + trrEffectiveAmount(t), 0);
+    const postsAmount  = sumAmt(posts);
+    const eventsAmount = sumAmt(events);
+    const supportOnOppAmount     = sumAmt(supportOnOpp);
+    const supportStandaloneAmount = sumAmt(supportStandalone);
+
+    // Top 10 cuentas por count (Opp + Post + Event en rango)
+    const oppsInRange = base.filter(t => (t.engagementType || 'Opportunity') === 'Opportunity' && trrOverlapsRange(t, from, to));
+    const byAccountCount  = {};
+    const byAccountAmount = {};
+    const bumpCount = (acc, kind) => {
+        if (!acc) return;
+        if (!byAccountCount[acc])  byAccountCount[acc]  = {opp: 0, post: 0, event: 0};
+        byAccountCount[acc][kind]++;
+    };
+    const bumpAmount = (acc, kind, amt) => {
+        if (!acc || !(amt > 0)) return;
+        if (!byAccountAmount[acc]) byAccountAmount[acc] = {opp: 0, post: 0, event: 0};
+        byAccountAmount[acc][kind] += amt;
+    };
+    oppsInRange.forEach(t => { bumpCount(t.accountName, 'opp');   bumpAmount(t.accountName, 'opp',   trrEffectiveAmount(t)); });
+    posts.forEach(       t => { bumpCount(t.accountName, 'post');  bumpAmount(t.accountName, 'post',  trrEffectiveAmount(t)); });
+    events.forEach(      t => { bumpCount(t.accountName, 'event'); bumpAmount(t.accountName, 'event', trrEffectiveAmount(t)); });
+
+    const topAccountsByCount = Object.entries(byAccountCount)
+        .map(([acc, c]) => ({acc, ...c, total: c.opp + c.post + c.event}))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 10);
+    const topAccountsByAmount = Object.entries(byAccountAmount)
+        .map(([acc, c]) => ({acc, ...c, total: c.opp + c.post + c.event}))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 10);
+
+    return {
+        posts, events, supportOnOpp, supportStandalone,
+        postsAmount, eventsAmount, supportOnOppAmount, supportStandaloneAmount,
+        topAccountsByCount, topAccountsByAmount,
+    };
+}
+
+function renderSupportKPIs(s) {
+    const kpi = (label, val, sub = '', color = 'primary', icon = '') => `
+        <div class="col-md-3 col-6">
+            <div class="card p-3 h-100" style="border-left:4px solid var(--bs-${color});">
+                <div class="small text-muted text-uppercase fw-bold" style="font-size:.7rem;letter-spacing:.5px;">${icon ? '<i class="'+icon+' me-1"></i>' : ''}${label}</div>
+                <div class="mt-1" style="font-size:1.5rem;font-weight:800;">${val}</div>
+                ${sub ? `<div class="small text-muted">${sub}</div>` : ''}
+            </div>
+        </div>`;
+    const amtSub = a => a > 0 ? `${fmtMoney(a)} associated` : 'no amount data';
+    document.getElementById('supportKPIs').innerHTML =
+        kpi('Post Sales',      s.posts.length,  amtSub(s.postsAmount),           'info',    'fas fa-phone-alt') +
+        kpi('Events',          s.events.length, amtSub(s.eventsAmount),          'warning', 'fas fa-calendar-star') +
+        kpi('On Opp accounts', s.supportOnOpp.length,      amtSub(s.supportOnOppAmount),     'success',  'fas fa-bullseye') +
+        kpi('Standalone',      s.supportStandalone.length, amtSub(s.supportStandaloneAmount),'secondary','fas fa-seedling');
+}
+
+function renderSupportCharts(s) {
+    ['accounts','accountsAmt','split'].forEach(k => {
+        if (metricsCharts[k]) { try { metricsCharts[k].destroy(); } catch(e){} delete metricsCharts[k]; }
+    });
+
+    // Top accounts by COUNT
+    const labelsCount = s.topAccountsByCount.map(a => a.acc);
+    metricsCharts.accounts = new ApexCharts(document.getElementById('chartAccounts'), {
+        chart: {type: 'bar', height: 280, stacked: true, toolbar: {show: false}},
+        plotOptions: {bar: {horizontal: true}},
+        series: [
+            {name: 'Opp',        data: s.topAccountsByCount.map(a => a.opp)},
+            {name: 'Post Sales', data: s.topAccountsByCount.map(a => a.post)},
+            {name: 'Event',      data: s.topAccountsByCount.map(a => a.event)},
+        ],
+        xaxis: {categories: labelsCount},
+        colors: ['#0dcaf0', '#6f42c1', '#ffc107'],
+        legend: {position: 'top'},
+        dataLabels: {enabled: false},
+    });
+    metricsCharts.accounts.render();
+
+    // Top accounts by AMOUNT ($)
+    const labelsAmt = s.topAccountsByAmount.map(a => a.acc);
+    metricsCharts.accountsAmt = new ApexCharts(document.getElementById('chartAccountsAmount'), {
+        chart: {type: 'bar', height: 280, stacked: true, toolbar: {show: false}},
+        plotOptions: {bar: {horizontal: true}},
+        series: [
+            {name: 'Opp $',        data: s.topAccountsByAmount.map(a => a.opp)},
+            {name: 'Post Sales $', data: s.topAccountsByAmount.map(a => a.post)},
+            {name: 'Event $',      data: s.topAccountsByAmount.map(a => a.event)},
+        ],
+        xaxis: {categories: labelsAmt, labels: {formatter: v => fmtMoney(v)}},
+        colors: ['#0dcaf0', '#6f42c1', '#ffc107'],
+        legend: {position: 'top'},
+        dataLabels: {enabled: false},
+        tooltip: {y: {formatter: v => fmtMoney(v)}},
+    });
+    metricsCharts.accountsAmt.render();
+
+    metricsCharts.split = new ApexCharts(document.getElementById('chartSupportSplit'), {
+        chart: {type: 'donut', height: 280},
+        series: [s.supportOnOpp.length, s.supportStandalone.length],
+        labels: ['On Opp accounts', 'Standalone'],
+        colors: ['#198754', '#6c757d'],
+        legend: {position: 'bottom'},
+    });
+    metricsCharts.split.render();
+}
+
+function renderMetrics() {
+    populateMetricsFilters();
+    const filters = metricsCurrentFilters();
+    const m = computeMetrics(filters);
+    const prev = computePrevPeriodMetrics(filters);
+    const s = computeSupport(filters);
+    const mix = computeEngagementMix(filters);
+    const fmt = d => d.toISOString().substring(0,10);
+    const label = filters.label ? `<strong>${filters.label}</strong> · ` : '';
+    document.getElementById('mfSummary').innerHTML =
+        `${label}Rango: <strong>${fmt(filters.from)}</strong> → <strong>${fmt(filters.to)}</strong> · ` +
+        `<strong>${mix.total}</strong> TRRs in range (Opps: ${mix.opp} · Post: ${mix.post} · Events: ${mix.event}) · ` +
+        `Opps closed: <strong>${m.closed}</strong> · Won: <strong>${m.won}</strong> · Lost: <strong>${m.lost}</strong>`;
+    renderEngagementMix(mix);
+    renderMetricsKPIs(m, prev);
+    renderMetricsCharts(m);
+    renderDistrictCharts();
+    renderSupportKPIs(s);
+    renderSupportCharts(s);
+}
+
+// ═══ District Breakdown widgets (stacked) ═════════════════════════════════
+function renderDistrictCharts() {
+    const filters = metricsCurrentFilters();
+
+    // Base: aplica filtros globales (owner/product) — sólo Opps (Win/Loss no aplica a otros tipos)
+    const base = metricsFilterTRRs(filters).filter(t => (t.engagementType || 'Opportunity') === 'Opportunity');
+    const parseAmt = v => parseFloat((v || '').toString().replace(/[",$\s]/g, '')) || 0;
+
+    // Bucket por distrito con 4 sub-categorías (count + amount).
+    // TRRs sin distrito se acumulan aparte y se muestran como footer note (no en el gráfico).
+    const buckets = {};
+    const noDistrict = {active: 0, won: 0, lost: 0, noDec: 0};
+    const emptyBucket = () => ({
+        active: {c: 0, a: 0}, won: {c: 0, a: 0}, lost: {c: 0, a: 0}, noDec: {c: 0, a: 0}
+    });
+    const classifyKey = (t) => {
+        if (t.projectStatus !== 'Closed') return 'active';
+        if (!inRange(trrEndDate(t), filters.from, filters.to)) return null;
+        if (t.commercialOutcome === 'Won')  return 'won';
+        if (t.commercialOutcome === 'Lost') return 'lost';
+        if (t.commercialOutcome === 'No Decision') return 'noDec';
+        return null;
+    };
+
+    base.forEach(t => {
+        const key = classifyKey(t);
+        if (!key) return;
+        const d = (t.district || '').trim();
+        if (!d) { noDistrict[key]++; return; }
+        if (!buckets[d]) buckets[d] = emptyBucket();
+        const amt = key === 'won' ? parseAmt(t.finalAmount) : parseAmt(t.oppAmount);
+        buckets[d][key].c++;
+        buckets[d][key].a += amt;
+    });
+
+    // Ordena distritos por total count desc
+    const entries = Object.entries(buckets).sort((a, b) => {
+        const ta = a[1].active.c + a[1].won.c + a[1].lost.c + a[1].noDec.c;
+        const tb = b[1].active.c + b[1].won.c + b[1].lost.c + b[1].noDec.c;
+        return tb - ta;
+    });
+
+    const footer = document.getElementById('districtFooterHint');
+    const noDistTotal = noDistrict.active + noDistrict.won + noDistrict.lost + noDistrict.noDec;
+
+    ['distCount', 'distAmount'].forEach(k => {
+        if (metricsCharts[k]) { try { metricsCharts[k].destroy(); } catch(e){} delete metricsCharts[k]; }
+    });
+
+    // Footer note sobre TRRs sin distrito (siempre visible si hay alguno)
+    if (footer) {
+        if (noDistTotal > 0) {
+            const parts = [];
+            if (noDistrict.active) parts.push(`${noDistrict.active} Active`);
+            if (noDistrict.won)    parts.push(`${noDistrict.won} Won`);
+            if (noDistrict.lost)   parts.push(`${noDistrict.lost} Lost`);
+            if (noDistrict.noDec)  parts.push(`${noDistrict.noDec} No Decision`);
+            footer.innerHTML = `<i class="fas fa-info-circle text-warning me-1"></i>${noDistTotal} TRR${noDistTotal===1?'':'s'} sin distrito asignado (no mostrados en el gráfico): ${parts.join(' · ')}. Edita cada TRR para asignar el District.`;
+        } else {
+            footer.innerHTML = '';
+        }
+    }
+
+    if (entries.length === 0) {
+        document.getElementById('chartDistrictCount').innerHTML  = '<div class="text-muted small p-3 text-center">No hay TRRs con distrito en el rango/filtros seleccionados.</div>';
+        document.getElementById('chartDistrictAmount').innerHTML = '';
+        return;
+    }
+
+    const catMeta = {
+        active: {label: 'Active',      color: '#0d6efd'},
+        won:    {label: 'Won',         color: '#198754'},
+        lost:   {label: 'Lost',        color: '#dc3545'},
+        noDec:  {label: 'No Decision', color: '#6c757d'},
+    };
+    const cats = ['active', 'won', 'lost', 'noDec'];
+    const labels = entries.map(([d]) => d);
+    const seriesCount  = cats.map(k => ({name: catMeta[k].label, data: entries.map(([_, b]) => b[k].c)}));
+    const seriesAmount = cats.map(k => ({name: catMeta[k].label, data: entries.map(([_, b]) => b[k].a)}));
+    const colors = cats.map(k => catMeta[k].color);
+
+    const baseOpts = {
+        chart: {type: 'bar', height: 260, stacked: true, toolbar: {show: false}},
+        plotOptions: {bar: {horizontal: true, borderRadius: 3}},
+        colors: colors,
+        legend: {position: 'top', horizontalAlign: 'right', fontSize: '11px'},
+        dataLabels: {enabled: false},
+    };
+
+    metricsCharts.distCount = new ApexCharts(document.getElementById('chartDistrictCount'), {
+        ...baseOpts,
+        series: seriesCount,
+        xaxis: {categories: labels, labels: {formatter: v => Math.round(v).toString()}},
+        tooltip: {y: {formatter: v => `${v} TRR${v === 1 ? '' : 's'}`}},
+    });
+    metricsCharts.distCount.render();
+
+    metricsCharts.distAmount = new ApexCharts(document.getElementById('chartDistrictAmount'), {
+        ...baseOpts,
+        series: seriesAmount,
+        xaxis: {categories: labels, labels: {formatter: v => fmtMoney(v)}},
+        tooltip: {y: {formatter: v => fmtMoney(v)}},
+    });
+    metricsCharts.distAmount.render();
+}
+
+function exportMetricsCSV() {
+    const filters = metricsCurrentFilters();
+    const base = metricsFilterTRRs(filters);
+    const rows = [
+        ['id','trrName','account','owner','type','products','status','startDate','closedDate','oppAmount','finalAmount','commercialOutcome','technicalOutcome','lossReason']
+    ];
+    base.forEach(t => rows.push([
+        t.id, t.trrName, t.accountName, t.ownerName, t.engagementType || 'Opportunity',
+        t.cortexProduct || '', t.projectStatus, t.startDate || '', trrEndDate(t),
+        t.oppAmount || '', t.finalAmount || '',
+        t.commercialOutcome || '', t.technicalOutcome || '', t.lossReason || '',
+    ]));
+    const csv = rows.map(r => r.map(v => {
+        const s = String(v ?? '').replace(/"/g,'""');
+        return /[",\n]/.test(s) ? `"${s}"` : s;
+    }).join(',')).join('\n');
+    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `povradar_metrics_${filters.from.toISOString().slice(0,10)}_${filters.to.toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
 }
 
 </script>
