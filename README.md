@@ -16,7 +16,7 @@ PANTools has two editions, each with its own login:
 | Edition | Who | Login |
 |---|---|---|
 | **Partner Edition** | Partner SEs | Shared password |
-| **SE Edition** | Palo Alto Networks SEs | GitHub PAT with access to Other Tools |
+| **SE Edition** | Palo Alto Networks SEs | GitHub PAT with access to `davidpm84/cortexcustomintegrations` |
 
 SE Edition users also get access to the **Admin Panel** to generate access tokens and manage deployed tools.
 
@@ -32,7 +32,8 @@ SE Edition users also get access to the **Admin Panel** to generate access token
 - **Cortex Health & Audit** — API-driven Best Practice Assessment (BPA). Runs automated checks for unparsed logs, stale endpoints, upgrade loops, EDR settings, and Malware/Exploit profiles. Compatible with XDR 5.1 & XSIAM 3.5.
 
 ### Management — PoV & Tracking
-- **PoV Radar** — Track TRRs, PoV statuses, global timelines, and SFDC links.
+- **PoV Radar** — Track TRRs, PoV statuses, global timelines, and SFDC links. Includes a Metrics Dashboard with FY/quarter filters, commercial & technical outcomes, district breakdown, win-rate by product, loss reasons, Post Sales / Events activity and CSV export.
+- **TimeTracker** — Weekly working-hours tracker (single-file PHP + SQLite). Start/stop sessions with notes, log vacations and monthly adjustments, manage holidays, and configure per-weekday hours plus intensive-period presets (e.g. summer schedule). Ships with an empty `tracker.empty.sqlite` template for fresh deployments.
 
 ### Dynamic Tools (SE Edition)
 SE users can deploy additional tools from private GitHub repositories using base64 access tokens. Tools are installed with a single click and appear as cards in the hub alongside built-in tools.
