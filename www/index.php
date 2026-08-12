@@ -671,6 +671,10 @@ $iconCatalogue = [
                 <span class="badge text-white badge-partner"><i class="fas fa-handshake me-1"></i>Partner Edition</span>
             <?php elseif ($isSE): ?>
                 <span class="badge bg-success text-white"><i class="fas fa-star me-1"></i>SE Edition</span>
+                <button type="button" class="btn btn-sm btn-outline-light fw-semibold" id="pantoolsUserBadge"
+                        data-bs-toggle="modal" data-bs-target="#pantoolsUserModal" title="Change your name">
+                    <i class="fas fa-user me-1"></i><span id="pantoolsUserBadgeName">Set your name</span>
+                </button>
                 <a href="<?= $_SERVER['PHP_SELF'] ?>?admin=1" class="btn btn-sm btn-outline-secondary fw-bold">
                     <i class="fas fa-cog me-1"></i>Admin
                 </a>
@@ -1037,6 +1041,14 @@ $iconCatalogue = [
                     <a href="other/povradar.php" class="btn-mgmt">Open Tracker</a>
                 </div>
             </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="card tool-card card-mgmt p-4 text-center">
+                    <div class="card-icon" style="color:var(--mgmt-color);"><i class="fas fa-clock"></i></div>
+                    <h5 class="fw-bold mb-2">TimeTracker</h5>
+                    <p class="card-desc">Control de horario, banco de horas, vacaciones y festivos con informe imprimible.</p>
+                    <a href="other/timetracker/" class="btn-mgmt">Open Tracker</a>
+                </div>
+            </div>
             <?php foreach (toolsForSection($activeTools, 'management') as $dt):
                 $dtExp = !empty($dt['expires_at']) ? expiryStatus($dt['expires_at']) : null;
             ?>
@@ -1100,7 +1112,98 @@ $iconCatalogue = [
   </div>
 </div>
 
+<?php if ($isSE): ?>
+<!-- PANTools User Modal (SE only) -->
+<div class="modal fade" id="pantoolsUserModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="pantoolsUserForm">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold"><i class="fas fa-user-circle me-2 text-success"></i>Your PANTools identity</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-4">
+          <label class="form-label fw-semibold">Full name</label>
+          <input type="text" class="form-control" id="pantoolsUserInput" placeholder="e.g. David de La Paz" required>
+          <div class="small text-muted mt-2">
+            Se usará en todas las herramientas de PANTools: PoV Radar (owner), TimeTracker, RFP Generator (prepared by), Cortex Audit, etc.
+            Guardado en tu navegador. Puedes cambiarlo cuando quieras desde el botón de arriba.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success btn-sm fw-bold">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<?php if ($isSE): ?>
+<script>
+// ═══ PANTools user identity (shared across tools via localStorage) ══════════
+(function() {
+    const KEY = 'pantools_user_name';
+    // Legacy fallbacks — read once at boot if primary key is empty
+    const LEGACY_KEYS = ['pov_radar_default_owner'];
+
+    window.PANToolsUser = {
+        get() { return (localStorage.getItem(KEY) || '').trim(); },
+        set(name) {
+            name = (name || '').trim();
+            if (!name) return false;
+            localStorage.setItem(KEY, name);
+            // Sync legacy keys so old tools still see the name
+            LEGACY_KEYS.forEach(k => localStorage.setItem(k, name));
+            renderBadge(name);
+            return true;
+        },
+        clear() { localStorage.removeItem(KEY); renderBadge(''); },
+    };
+
+    function renderBadge(name) {
+        const el = document.getElementById('pantoolsUserBadgeName');
+        if (el) el.textContent = name || 'Set your name';
+    }
+
+    // Boot: migrate from legacy keys if primary is empty
+    let current = window.PANToolsUser.get();
+    if (!current) {
+        for (const k of LEGACY_KEYS) {
+            const v = (localStorage.getItem(k) || '').trim();
+            if (v) { current = v; localStorage.setItem(KEY, v); break; }
+        }
+    }
+    renderBadge(current);
+
+    // Prefill input when modal opens, focus it
+    const modalEl = document.getElementById('pantoolsUserModal');
+    if (modalEl) {
+        modalEl.addEventListener('shown.bs.modal', () => {
+            const input = document.getElementById('pantoolsUserInput');
+            input.value = window.PANToolsUser.get();
+            input.focus();
+            input.select();
+        });
+        // Submit
+        document.getElementById('pantoolsUserForm').addEventListener('submit', e => {
+            e.preventDefault();
+            const val = document.getElementById('pantoolsUserInput').value;
+            if (window.PANToolsUser.set(val)) {
+                bootstrap.Modal.getInstance(modalEl).hide();
+            }
+        });
+        // First-visit prompt: if still empty after boot, open modal automatically
+        if (!current) {
+            setTimeout(() => new bootstrap.Modal(modalEl).show(), 400);
+        }
+    }
+})();
+</script>
+<?php endif; ?>
+
 <script>
 function copyField(id, btn) {
     const el = document.getElementById(id);
