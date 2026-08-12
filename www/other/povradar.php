@@ -754,7 +754,7 @@
 
                         <div class="col-md-4">
                             <label class="form-label fw-bold"><i class="fas fa-map-marker-alt me-1 text-muted"></i>District</label>
-                            <input type="text" class="form-control" id="district" list="districtsList" placeholder="e.g. Spain Majors" autocomplete="off">
+                            <input type="text" class="form-control" id="district" list="districtsList" autocomplete="off">
                             <datalist id="districtsList"></datalist>
                             <div class="form-text small">Account Owner District. Autocomplete from existing ones.</div>
                         </div>
@@ -2506,7 +2506,7 @@ function getTodayLocalISO() {
 //  FISCAL YEAR SETTINGS
 // ═══════════════════════════════════════════════════════════════════════════
 const FY_STORAGE_KEY = 'pov_radar_fy_start_month';
-const FY_DEFAULT_MONTH = 8; // Agosto por default (Palo Alto)
+const FY_DEFAULT_MONTH = 8;
 
 function getFYStartMonth() {
     const v = parseInt(localStorage.getItem(FY_STORAGE_KEY) || '', 10);
